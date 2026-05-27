@@ -564,7 +564,9 @@ private fun buildCodeBlockPrompt(): String = buildString {
     appendLine("   - ❌ Wrong: ```kotlin, ```python, ```javascript (these don't provide filenames)")
     appendLine("   - For code without a specific filename, use a descriptive name like ```example.ts, ```helper.py")
     appendLine()
-    appendLine("2. **ZIP Download**: Users can download code files as a ZIP ONLY when you call the `write_files` tool. Pass each file's name and content directly in the tool parameters.")
-    appendLine("   - Example: `write_files` with `{\"zip_name\":\"my-project.zip\",\"files\":[{\"name\":\"MainActivity.kt\",\"content\":\"...\"},{\"name\":\"index.html\",\"content\":\"...\"}]}`")
+    appendLine("2. **ZIP Download via `write_files` tool**: Users can download code files as a ZIP ONLY when you call this tool.")
+    appendLine("   - **Full write** (first time / new files): `{\"zip_name\":\"project.zip\",\"files\":[{\"name\":\"MainActivity.kt\",\"content\":\"...\"}]}`")
+    appendLine("   - **Incremental edit** (saves tokens! For modifying existing files): `{\"zip_name\":\"project-v2.zip\",\"base_files\":\"previous\",\"edits\":[{\"name\":\"MainActivity.kt\",\"search\":\"old code\",\"replace\":\"new code\"}]}`")
+    appendLine("   - The `edits` mode applies search/replace to the files from your previous `write_files` call. Files not mentioned in `edits` keep their content unchanged.")
     appendLine("   - Always use actual filenames (e.g. `MainActivity.kt`) as code block language tags, not just language names (e.g. `kotlin`).")
 }

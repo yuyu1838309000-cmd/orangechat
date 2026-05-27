@@ -84,9 +84,56 @@ object FileUtils {
         val ext = fileName.substringAfterLast('.', "").lowercase()
         if (ext.isNotEmpty()) {
             return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
-                ?: "application/octet-stream"
+                ?: guessMimeTypeFromExtension(ext)
         }
         return sniffMimeType(file)
+    }
+
+    /**
+     * 从文件扩展名猜测 MIME 类型，补充 Android MimeTypeMap 可能缺失的常见扩展名。
+     */
+    fun guessMimeTypeFromExtension(ext: String): String {
+        val lower = ext.lowercase()
+        // Common code files that MimeTypeMap might not cover
+        return when (lower) {
+            "kt", "kts" -> "text/kotlin"
+            "js", "mjs", "cjs" -> "text/javascript"
+            "ts", "tsx" -> "text/typescript"
+            "jsx" -> "text/jsx"
+            "py" -> "text/x-python"
+            "rb" -> "text/x-ruby"
+            "rs" -> "text/x-rust"
+            "go" -> "text/x-go"
+            "swift" -> "text/x-swift"
+            "dart" -> "text/x-dart"
+            "vue" -> "text/x-vue"
+            "svelte" -> "text/x-svelte"
+            "lua" -> "text/x-lua"
+            "r" -> "text/x-r"
+            "scala" -> "text/x-scala"
+            "clj" -> "text/x-clojure"
+            "ex", "exs" -> "text/x-elixir"
+            "erl" -> "text/x-erlang"
+            "hs" -> "text/x-haskell"
+            "ml", "fs" -> "text/x-ocaml"
+            "proto" -> "text/x-proto"
+            "graphql", "gql" -> "text/x-graphql"
+            "toml" -> "text/x-toml"
+            "dockerfile" -> "text/x-dockerfile"
+            "asm" -> "text/x-asm"
+            "v", "sv" -> "text/x-verilog"
+            "vhd", "vhdl" -> "text/x-vhdl"
+            "md", "markdown" -> "text/markdown"
+            "mdx" -> "text/x-mdx"
+            "env" -> "text/plain"
+            "gitignore", "editorconfig", "prettierrc", "eslintrc" -> "text/plain"
+            "conf", "cfg" -> "text/plain"
+            "log" -> "text/plain"
+            "lock" -> "text/plain"
+            "svg" -> "image/svg+xml"
+            else -> MimeTypeMap.getSingleton().getMimeTypeFromExtension(lower)
+                ?: "application/octet-stream"
+        }
     }
 
     fun compressBitmapToPng(bitmap: Bitmap): ByteArray = ByteArrayOutputStream().use {

@@ -324,83 +324,102 @@ fun ChatInput(
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     "application/vnd.ms-powerpoint",
                     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    "application/epub+zip"
+                    "application/epub+zip",
+                    "application/zip", "application/x-zip-compressed"
                 )
-                val documents = uris.mapNotNull { uri ->
+
+                val allDocuments = mutableListOf<UIMessagePart.Document>()
+                val allImageUris = mutableListOf<Uri>()
+
+                uris.forEach { uri ->
                     val fileName = filesManager.getFileNameFromUri(uri) ?: "file"
                     val mime = filesManager.getFileMimeType(uri) ?: "text/plain"
-                    val isAllowed = allowedMimeTypes.contains(mime) || mime.startsWith("text/") ||
-                        mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-                        mime == "application/pdf" ||
-                        fileName.endsWith(".txt", ignoreCase = true) ||
-                        fileName.endsWith(".md", ignoreCase = true) ||
-                        fileName.endsWith(".csv", ignoreCase = true) ||
-                        fileName.endsWith(".json", ignoreCase = true) ||
-                        fileName.endsWith(".js", ignoreCase = true) ||
-                        fileName.endsWith(".jsx", ignoreCase = true) ||
-                        fileName.endsWith(".mjs", ignoreCase = true) ||
-                        fileName.endsWith(".cjs", ignoreCase = true) ||
-                        fileName.endsWith(".html", ignoreCase = true) ||
-                        fileName.endsWith(".css", ignoreCase = true) ||
-                        fileName.endsWith(".vue", ignoreCase = true) ||
-                        fileName.endsWith(".svelte", ignoreCase = true) ||
-                        fileName.endsWith(".xml", ignoreCase = true) ||
-                        fileName.endsWith(".py", ignoreCase = true) ||
-                        fileName.endsWith(".rb", ignoreCase = true) ||
-                        fileName.endsWith(".lua", ignoreCase = true) ||
-                        fileName.endsWith(".sql", ignoreCase = true) ||
-                        fileName.endsWith(".java", ignoreCase = true) ||
-                        fileName.endsWith(".kt", ignoreCase = true) ||
-                        fileName.endsWith(".ts", ignoreCase = true) ||
-                        fileName.endsWith(".tsx", ignoreCase = true) ||
-                        fileName.endsWith(".dart", ignoreCase = true) ||
-                        fileName.endsWith(".php", ignoreCase = true) ||
-                        fileName.endsWith(".swift", ignoreCase = true) ||
-                        fileName.endsWith(".go", ignoreCase = true) ||
-                        fileName.endsWith(".bat", ignoreCase = true) ||
-                        fileName.endsWith(".cmd", ignoreCase = true) ||
-                        fileName.endsWith(".ps1", ignoreCase = true) ||
-                        fileName.endsWith(".psm1", ignoreCase = true) ||
-                        fileName.endsWith(".sh", ignoreCase = true) ||
-                        fileName.endsWith(".bash", ignoreCase = true) ||
-                        fileName.endsWith(".zsh", ignoreCase = true) ||
-                        fileName.endsWith(".fish", ignoreCase = true) ||
-                        fileName.endsWith(".c", ignoreCase = true) ||
-                        fileName.endsWith(".h", ignoreCase = true) ||
-                        fileName.endsWith(".cpp", ignoreCase = true) ||
-                        fileName.endsWith(".cc", ignoreCase = true) ||
-                        fileName.endsWith(".cxx", ignoreCase = true) ||
-                        fileName.endsWith(".hpp", ignoreCase = true) ||
-                        fileName.endsWith(".hh", ignoreCase = true) ||
-                        fileName.endsWith(".hxx", ignoreCase = true) ||
-                        fileName.endsWith(".rs", ignoreCase = true) ||
-                        fileName.endsWith(".cs", ignoreCase = true) ||
-                        fileName.endsWith(".markdown", ignoreCase = true) ||
-                        fileName.endsWith(".mdx", ignoreCase = true) ||
-                        fileName.endsWith(".toml", ignoreCase = true) ||
-                        fileName.endsWith(".ini", ignoreCase = true) ||
-                        fileName.endsWith(".env", ignoreCase = true) ||
-                        fileName.endsWith(".gradle", ignoreCase = true) ||
-                        fileName.endsWith(".kts", ignoreCase = true) ||
-                        fileName.endsWith(".properties", ignoreCase = true) ||
-                        fileName.endsWith(".proto", ignoreCase = true) ||
-                        fileName.endsWith(".graphql", ignoreCase = true) ||
-                        fileName.endsWith(".gql", ignoreCase = true) ||
-                        fileName.endsWith(".yml", ignoreCase = true) ||
-                        fileName.endsWith(".yaml", ignoreCase = true)
-                    if (isAllowed) {
-                        val localUri = filesManager.createChatFilesByContents(listOf(uri))[0]
-                        UIMessagePart.Document(url = localUri.toString(), fileName = fileName, mime = mime)
+                    val isZip = mime == "application/zip" || mime == "application/x-zip-compressed" ||
+                        fileName.endsWith(".zip", ignoreCase = true)
+
+                    if (isZip) {
+                        // Auto-extract ZIP and add internal files
+                        val extracted = filesManager.extractZipToChatFiles(uri, fileName)
+                        allDocuments.addAll(extracted.documents)
+                        allImageUris.addAll(extracted.images)
                     } else {
-                        toaster.show(
-                            context.getString(R.string.chat_input_unsupported_file_type, fileName),
-                            type = ToastType.Error
-                        )
-                        null
+                        val isAllowed = allowedMimeTypes.contains(mime) || mime.startsWith("text/") ||
+                            mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+                            mime == "application/pdf" ||
+                            fileName.endsWith(".txt", ignoreCase = true) ||
+                            fileName.endsWith(".md", ignoreCase = true) ||
+                            fileName.endsWith(".csv", ignoreCase = true) ||
+                            fileName.endsWith(".json", ignoreCase = true) ||
+                            fileName.endsWith(".js", ignoreCase = true) ||
+                            fileName.endsWith(".jsx", ignoreCase = true) ||
+                            fileName.endsWith(".mjs", ignoreCase = true) ||
+                            fileName.endsWith(".cjs", ignoreCase = true) ||
+                            fileName.endsWith(".html", ignoreCase = true) ||
+                            fileName.endsWith(".css", ignoreCase = true) ||
+                            fileName.endsWith(".vue", ignoreCase = true) ||
+                            fileName.endsWith(".svelte", ignoreCase = true) ||
+                            fileName.endsWith(".xml", ignoreCase = true) ||
+                            fileName.endsWith(".py", ignoreCase = true) ||
+                            fileName.endsWith(".rb", ignoreCase = true) ||
+                            fileName.endsWith(".lua", ignoreCase = true) ||
+                            fileName.endsWith(".sql", ignoreCase = true) ||
+                            fileName.endsWith(".java", ignoreCase = true) ||
+                            fileName.endsWith(".kt", ignoreCase = true) ||
+                            fileName.endsWith(".ts", ignoreCase = true) ||
+                            fileName.endsWith(".tsx", ignoreCase = true) ||
+                            fileName.endsWith(".dart", ignoreCase = true) ||
+                            fileName.endsWith(".php", ignoreCase = true) ||
+                            fileName.endsWith(".swift", ignoreCase = true) ||
+                            fileName.endsWith(".go", ignoreCase = true) ||
+                            fileName.endsWith(".bat", ignoreCase = true) ||
+                            fileName.endsWith(".cmd", ignoreCase = true) ||
+                            fileName.endsWith(".ps1", ignoreCase = true) ||
+                            fileName.endsWith(".psm1", ignoreCase = true) ||
+                            fileName.endsWith(".sh", ignoreCase = true) ||
+                            fileName.endsWith(".bash", ignoreCase = true) ||
+                            fileName.endsWith(".zsh", ignoreCase = true) ||
+                            fileName.endsWith(".fish", ignoreCase = true) ||
+                            fileName.endsWith(".c", ignoreCase = true) ||
+                            fileName.endsWith(".h", ignoreCase = true) ||
+                            fileName.endsWith(".cpp", ignoreCase = true) ||
+                            fileName.endsWith(".cc", ignoreCase = true) ||
+                            fileName.endsWith(".cxx", ignoreCase = true) ||
+                            fileName.endsWith(".hpp", ignoreCase = true) ||
+                            fileName.endsWith(".hh", ignoreCase = true) ||
+                            fileName.endsWith(".hxx", ignoreCase = true) ||
+                            fileName.endsWith(".rs", ignoreCase = true) ||
+                            fileName.endsWith(".cs", ignoreCase = true) ||
+                            fileName.endsWith(".markdown", ignoreCase = true) ||
+                            fileName.endsWith(".mdx", ignoreCase = true) ||
+                            fileName.endsWith(".toml", ignoreCase = true) ||
+                            fileName.endsWith(".ini", ignoreCase = true) ||
+                            fileName.endsWith(".env", ignoreCase = true) ||
+                            fileName.endsWith(".gradle", ignoreCase = true) ||
+                            fileName.endsWith(".kts", ignoreCase = true) ||
+                            fileName.endsWith(".properties", ignoreCase = true) ||
+                            fileName.endsWith(".proto", ignoreCase = true) ||
+                            fileName.endsWith(".graphql", ignoreCase = true) ||
+                            fileName.endsWith(".gql", ignoreCase = true) ||
+                            fileName.endsWith(".yml", ignoreCase = true) ||
+                            fileName.endsWith(".yaml", ignoreCase = true)
+                        if (isAllowed) {
+                            val localUri = filesManager.createChatFilesByContents(listOf(uri))[0]
+                            allDocuments.add(UIMessagePart.Document(url = localUri.toString(), fileName = fileName, mime = mime))
+                        } else {
+                            toaster.show(
+                                context.getString(R.string.chat_input_unsupported_file_type, fileName),
+                                type = ToastType.Error
+                            )
+                        }
                     }
                 }
-                if (documents.isNotEmpty()) {
-                    state.addFiles(documents)
+                if (allDocuments.isNotEmpty()) {
+                    state.addFiles(allDocuments)
+                }
+                if (allImageUris.isNotEmpty()) {
+                    state.addImages(allImageUris)
+                }
+                if (allDocuments.isNotEmpty() || allImageUris.isNotEmpty()) {
                     dismissExpand()
                 }
             }

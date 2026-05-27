@@ -23,6 +23,7 @@ import me.rerere.rikkahub.data.repository.FilesRepository
 import me.rerere.rikkahub.utils.exportImage
 import me.rerere.rikkahub.utils.exportImageFile
 import me.rerere.rikkahub.utils.getActivity
+import java.util.zip.ZipInputStream
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -435,7 +436,206 @@ class FilesManager(
 
     private fun guessMimeType(file: File, fileName: String): String =
         FileUtils.guessMimeType(file, fileName)
+
+    /**
+     * 已知的文本文件扩展名（小写，不含点号）
+     */
+    private val TEXT_EXTENSIONS = setOf(
+        "txt", "md", "csv", "json", "js", "jsx", "mjs", "cjs",
+        "html", "css", "vue", "svelte", "xml",
+        "py", "rb", "lua", "sql",
+        "java", "kt", "ts", "tsx", "dart", "php", "swift", "go",
+        "bat", "cmd", "ps1", "psm1", "sh", "bash", "zsh", "fish",
+        "c", "h", "cpp", "cc", "cxx", "hpp", "hh", "hxx",
+        "rs", "cs", "markdown", "mdx",
+        "toml", "ini", "env", "gradle", "kts", "properties",
+        "proto", "graphql", "gql",
+        "yml", "yaml",
+        "r", "scala", "clj", "ex", "exs", "erl", "hs",
+        "ml", "fs", "cob", "cbl", "f90", "f",
+        "asm", "s", "v", "sv", "vhd", "vhdl",
+        "cmake", "make", "dockerfile",
+        "gitignore", "editorconfig", "prettierrc", "eslintrc",
+        "lock", "log", "conf", "cfg",
+    )
+
+    private val IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg", "gif", "webp", "bmp", "svg")
+
+    /**
+     * 从 ZIP 文件中提取内容并转为聊天附件。
+     * - 文本文件 → UIMessagePart.Document
+     * - 图片文件 → Uri（用于 addImages）
+     * - 其他文件 → 跳过并记录
+     * - 自动跳过隐藏文件/目录（以 . 开头）和 __MACOSX 等
+     */
+    fun extractZipToChatFiles(
+        zipUri: Uri,
+        zipFileName: String,
+    ): ZipExtractResult {
+        val documents = mutableListOf<UIMessagePart.Document>()
+        val images = mutableListOf<Uri>()
+        val skippedFiles = mutableListOf<String>()
+
+        val dir = context.filesDir.resolve(FileFolders.UPLOAD)
+        if (!dir.exists()) dir.mkdirs()
+
+        context.contentResolver.openInputStream(zipUri)?.use { inputStream ->
+            ZipInputStream(inputStream).use { zis ->
+                var entry = zis.nextEntry
+                while (entry != null) {
+                    val entryName = entry.name
+
+                    // Skip directories, hidden files, and macOS metadata
+                    if (entry.isDirectory ||
+                        entryName.startsWith("__MACOSX") ||
+                        entryName.split("/").any { it.startsWith(".") }
+                    ) {
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                        continue
+                    }
+
+                    // Get just the filename (without path)
+                    val fileName = entryName.substringAfterLast("/")
+                    if (fileName.isBlank()) {
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                        continue
+                    }
+
+                    val ext = fileName.substringAfterLast(".", "").lowercase()
+
+                    when {
+                        ext in IMAGE_EXTENSIONS -> {
+                            val savedName = buildUuidFileName(displayName = fileName, mimeType = "image/$ext")
+                            val file = dir.resolve(savedName)
+                            file.outputStream().use { output -> zis.copyTo(output) }
+                            trackManagedFile(
+                                folder = FileFolders.UPLOAD,
+                                file = file,
+                                displayName = fileName,
+                                mimeType = "image/$ext"
+                            )
+                            images.add(file.toUri())
+                        }
+
+                        ext in TEXT_EXTENSIONS -> {
+                            val mime = FileUtils.guessMimeTypeFromExtension(ext)
+                            val savedName = buildUuidFileName(displayName = fileName, mimeType = mime)
+                            val file = dir.resolve(savedName)
+                            file.outputStream().use { output -> zis.copyTo(output) }
+                            trackManagedFile(
+                                folder = FileFolders.UPLOAD,
+                                file = file,
+                                displayName = fileName,
+                                mimeType = mime
+                            )
+                            documents.add(
+                                UIMessagePart.Document(
+                                    url = file.toUri().toString(),
+                                    fileName = fileName,
+                                    mime = mime
+                                )
+                            )
+                        }
+
+                        ext == "pdf" || ext in setOf(
+                            "doc", "docx", "xls", "xlsx", "ppt", "pptx", "epub"
+                        ) -> {
+                            val mime = FileUtils.guessMimeTypeFromExtension(ext)
+                            val savedName = buildUuidFileName(displayName = fileName, mimeType = mime)
+                            val file = dir.resolve(savedName)
+                            file.outputStream().use { output -> zis.copyTo(output) }
+                            trackManagedFile(
+                                folder = FileFolders.UPLOAD,
+                                file = file,
+                                displayName = fileName,
+                                mimeType = mime
+                            )
+                            documents.add(
+                                UIMessagePart.Document(
+                                    url = file.toUri().toString(),
+                                    fileName = fileName,
+                                    mime = mime
+                                )
+                            )
+                        }
+
+                        ext == "zip" -> {
+                            skippedFiles.add(fileName)
+                        }
+
+                        else -> {
+                            if (entry.size in 1..100_000) {
+                                val bytes = zis.readBytes()
+                                val text = runCatching { String(bytes, Charsets.UTF_8) }.getOrNull()
+                                if (text != null && text.isValidUtf8Text()) {
+                                    val mime = "text/plain"
+                                    val savedName = buildUuidFileName(displayName = fileName, mimeType = mime)
+                                    val file = dir.resolve(savedName)
+                                    file.writeBytes(bytes)
+                                    trackManagedFile(
+                                        folder = FileFolders.UPLOAD,
+                                        file = file,
+                                        displayName = fileName,
+                                        mimeType = mime
+                                    )
+                                    documents.add(
+                                        UIMessagePart.Document(
+                                            url = file.toUri().toString(),
+                                            fileName = fileName,
+                                            mime = mime
+                                        )
+                                    )
+                                } else {
+                                    skippedFiles.add(fileName)
+                                }
+                            } else {
+                                skippedFiles.add(fileName)
+                            }
+                        }
+                    }
+
+                    zis.closeEntry()
+                    entry = zis.nextEntry
+                }
+            }
+        }
+
+        if (skippedFiles.isNotEmpty()) {
+            val summaryText = buildString {
+                appendLine("Files in '$zipFileName' that could not be extracted as text:")
+                skippedFiles.forEach { appendLine("- $it") }
+            }
+            val summaryDoc = createChatTextFile(summaryText)
+            documents.add(
+                UIMessagePart.Document(
+                    url = summaryDoc.url,
+                    fileName = "${zipFileName}_skipped_files.txt",
+                    mime = "text/plain"
+                )
+            )
+        }
+
+        return ZipExtractResult(documents = documents, images = images)
+    }
+
+    private fun String.isValidUtf8Text(): Boolean {
+        if (this.isEmpty()) return false
+        val sampleSize = minOf(length, 500)
+        val sample = this.take(sampleSize)
+        val printable = sample.count { !it.isISOControl() || it == '\n' || it == '\r' || it == '\t' }
+        return printable.toFloat() / sampleSize > 0.9f
+    }
 }
+
+/**
+ * ZIP 解压结果：文档列表 + 图片 URI 列表
+ */
+data class ZipExtractResult(
+    val documents: List<UIMessagePart.Document>,
+    val images: List<Uri>,
+)
 
 object FileFolders {
     const val UPLOAD = "upload"

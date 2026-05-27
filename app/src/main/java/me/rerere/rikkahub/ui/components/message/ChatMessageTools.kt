@@ -91,6 +91,7 @@ import me.rerere.hugeicons.stroke.Zip02
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.event.AppEvent
 import me.rerere.rikkahub.data.event.AppEventBus
+import me.rerere.rikkahub.data.ai.tools.WriteFilesCache
 import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.ui.components.richtext.HighlightCodeBlock
 import me.rerere.rikkahub.ui.components.richtext.MarkdownBlock
@@ -223,7 +224,13 @@ fun ChainOfThoughtScope.ChatMessageToolStep(
         ToolNames.ZIP_FILES, ToolNames.WRITE_FILES -> {
             val zipName = arguments.getStringContent("zip_name") ?: ""
             val fileCount = arguments.jsonObject.get("files")?.jsonArray?.size ?: 0
-            if (zipName.isNotBlank()) "📦 $zipName" else "💾 ${fileCount} files"
+            val editCount = arguments.jsonObject.get("edits")?.jsonArray?.size ?: 0
+            val isEdit = arguments.getStringContent("base_files") == "previous" && editCount > 0
+            when {
+                isEdit && zipName.isNotBlank() -> "✏️ $zipName ($editCount edits)"
+                zipName.isNotBlank() -> "📦 $zipName"
+                else -> "💾 ${fileCount} files"
+            }
         }
 
         else -> stringResource(R.string.chat_message_tool_call_generic, tool.toolName)
@@ -392,9 +399,9 @@ fun ChainOfThoughtScope.ChatMessageToolStep(
                         val totalFiles = content.jsonObject.get("total_files")?.jsonPrimitive?.contentOrNull?.toIntOrNull()
                             ?: content.jsonObject.get("files")?.jsonArray?.size ?: 0
 
-                        // Extract file contents from tool arguments
+                        // Extract file contents: from arguments (full mode) or from cache (edit mode)
                         val fileContents = remember(arguments) {
-                            arguments.jsonObject.get("files")?.jsonArray?.mapNotNull { fileElement ->
+                            val fromArgs = arguments.jsonObject.get("files")?.jsonArray?.mapNotNull { fileElement ->
                                 runCatching {
                                     val obj = fileElement.jsonObject
                                     val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
@@ -402,6 +409,13 @@ fun ChainOfThoughtScope.ChatMessageToolStep(
                                     name to content
                                 }.getOrNull()
                             } ?: emptyList()
+
+                            if (fromArgs.isNotEmpty()) {
+                                fromArgs
+                            } else {
+                                // Edit mode: use WriteFilesCache which has the merged files
+                                WriteFilesCache.getAll().toList()
+                            }
                         }
 
                         val scope = rememberCoroutineScope()
