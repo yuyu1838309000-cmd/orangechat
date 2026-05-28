@@ -184,6 +184,26 @@
       </intent-filter>
     </receiver>
 
+    <!-- Daily Cron Receiver (handles daily_cron alarm and boot completed) -->
+    <receiver
+      android:name=".data.service.DailySummaryReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="me.rerere.rikkahub.DAILY_CRON" />
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+      </intent-filter>
+    </receiver>
+
+    <!-- Daily Cron Trigger Service -->
+    <service
+      android:name=".data.service.DailySummaryTriggerService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="daily cron execution for plugin hooks" />
+    </service>
+
     <provider
       android:name="androidx.core.content.FileProvider"
       android:authorities="${applicationId}.fileprovider"

@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase 记忆库</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5; color: #333; padding: 16px;
+        }
+        
+        /* 头部 */
+        .header { 
+            display: flex; align-items: center; justify-content: space-between; 
+            margin-bottom: 16px; 
+        }
+        .header h1 { font-size: 20px; display: flex; align-items: center; gap: 8px; }
+        .status-badge {
+            padding: 4px 10px; border-radius: 12px; font-size: 11px;
+            font-weight: 500;
+        }
+        .status-badge.connected { background: #D3E8D3; color: #1E5A1E; }
+        .status-badge.disconnected { background: #FFDAD6; color: #BA1A1A; }
+        
+        /* 统计卡片 */
+        .stats-grid { 
+            display: grid; grid-template-columns: repeat(2, 1fr); 
+            gap: 10px; margin-bottom: 16px; 
+        }
+        .stat-card {
+            background: #fff; border-radius: 12px; padding: 14px 10px;
+            text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            transition: transform 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-card .icon { font-size: 20px; margin-bottom: 4px; }
+        .stat-card .number { 
+            font-size: 22px; font-weight: bold; color: #6750A4;
+            margin-bottom: 2px;
+        }
+        .stat-card .label { font-size: 11px; color: #666; }
+        
+        /* 配置卡片 */
+        .config-card {
+            background: #fff; border-radius: 12px; padding: 14px;
+            margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .config-card .title {
+            font-size: 14px; font-weight: 600; color: #333;
+            margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+        }
+        .config-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; border-bottom: 1px solid #f0f0f0;
+        }
+        .config-item:last-child { border-bottom: none; }
+        .config-item .label { font-size: 13px; color: #555; }
+        .config-item .value { 
+            font-size: 12px; color: #888; max-width: 60%;
+            text-align: right; overflow: hidden; text-overflow: ellipsis;
+        }
+        .config-item .value.enabled { color: #1E5A1E; }
+        .config-item .value.disabled { color: #888; }
+        
+        /* 标签页 */
+        .tabs {
+            display: flex; gap: 4px; margin-bottom: 12px;
+            background: #fff; border-radius: 10px; padding: 4px;
+        }
+        .tab {
+            flex: 1; padding: 10px; text-align: center;
+            font-size: 13px; cursor: pointer; border-radius: 8px;
+            transition: all 0.2s; color: #666;
+        }
+        .tab.active { 
+            background: #6750A4; color: #fff; font-weight: 500;
+        }
+        
+        /* 列表 */
+        .list-container { display: flex; flex-direction: column; gap: 10px; }
+        .empty-state {
+            text-align: center; color: #888; padding: 40px 20px;
+            background: #fff; border-radius: 12px;
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+        .empty-state .text { font-size: 14px; }
+        
+        /* 总结卡片 */
+        .summary-card {
+            background: #fff; border-radius: 12px; padding: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .summary-card .header-row {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px;
+        }
+        .summary-card .badge {
+            padding: 3px 10px; border-radius: 10px; font-size: 11px;
+            font-weight: 500;
+        }
+        .badge.summary { background: #E8DEF8; color: #6750A4; }
+        .badge.journal { background: #D3E8D3; color: #1E5A1E; }
+        .summary-card .date { font-size: 12px; color: #888; }
+        .summary-card .content {
+            font-size: 13px; line-height: 1.6; color: #444;
+            display: -webkit-box; -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .summary-card .footer {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0;
+        }
+        .summary-card .meta { font-size: 11px; color: #888; }
+        .summary-card .vector-badge {
+            font-size: 10px; padding: 2px 6px; border-radius: 4px;
+            background: #f0f0f0; color: #666;
+        }
+        
+        /* 操作按钮 */
+        .actions {
+            display: flex; gap: 8px; margin-bottom: 12px;
+        }
+        .btn {
+            flex: 1; padding: 10px; border-radius: 10px;
+            font-size: 13px; cursor: pointer; border: none;
+            display: flex; align-items: center; justify-content: center; gap: 4px;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #6750A4; color: #fff; }
+        .btn-secondary { background: #fff; color: #555; border: 1px solid #ddd; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* 加载动画 */
+        .loading {
+            text-align: center; padding: 40px; color: #888;
+        }
+        .spinner {
+            width: 32px; height: 32px; border: 3px solid #f0f0f0;
+            border-top-color: #6750A4; border-radius: 50%;
+            animation: spin 1s linear infinite; margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* 详情模态框 */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: #fff; border-radius: 16px; padding: 20px;
+            width: 100%; max-width: 500px; max-height: 80vh;
+            overflow: hidden;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 16px;
+        }
+        .modal-header h3 { font-size: 16px; }
+        .modal-close {
+            width: 32px; height: 32px; border-radius: 50%;
+            border: none; background: #f5f5f5; cursor: pointer;
+            font-size: 18px; color: #666;
+        }
+        .modal-content {
+            font-size: 14px; line-height: 1.7; color: #444;
+            max-height: 60vh; overflow-y: auto; white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <!-- 头部 -->
+    <div class="header">
+        <h1>🗄️ Supabase 记忆库</h1>
+        <span class="status-badge disconnected" id="statusBadge">未连接</span>
+    </div>
+    
+    <!-- 统计 -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="icon">📝</div>
+            <div class="number" id="summaryCount">-</div>
+            <div class="label">阶段总结</div>
+        </div>
+        <div class="stat-card">
+            <div class="icon">📔</div>
+            <div class="number" id="journalCount">-</div>
+            <div class="label">日记</div>
+        </div>
+    </div>
+    
+    <!-- 配置概览 -->
+    <div class="config-card">
+        <div class="title">⚙️ 配置状态</div>
+        <div class="config-item">
+            <span class="label">阶段总结</span>
+            <span class="value" id="summaryConfig">每 50 条消息</span>
+        </div>
+        <div class="config-item">
+            <span class="label">每日日记</span>
+            <span class="value" id="journalConfig">每天 03:00</span>
+        </div>
+        <div class="config-item">
+            <span class="label">向量化</span>
+            <span class="value disabled" id="vectorConfig">已关闭</span>
+        </div>
+    </div>
+    
+    <!-- 操作按钮 -->
+    <div class="actions">
+        <button class="btn btn-primary" onclick="refreshData()">🔄 刷新数据</button>
+        <button class="btn btn-secondary" onclick="manualJournal()">📔 生成昨日日记</button>
+    </div>
+    
+    <!-- 标签页 -->
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('summaries', this)">阶段总结</div>
+        <div class="tab" onclick="switchTab('journals', this)">每日日记</div>
+    </div>
+    
+    <!-- 列表内容 -->
+    <div class="list-container" id="listContainer">
+        <div class="loading">
+            <div class="spinner"></div>
+            <div>加载中...</div>
+        </div>
+    </div>
+    
+    <!-- 详情模态框 -->
+    <div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="modalTitle">详情</h3>
+                <button class="modal-close" onclick="hideModal()">×</button>
+            </div>
+            <div class="modal-content" id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'summaries';
+        let pluginConfig = {};
+        
+        // 初始化
+        async function init() {
+            await loadConfig();
+            await checkConnection();
+            await loadStats();
+            await loadList();
+        }
+        
+        // 辅助函数：判断配置值是否为启用状态
+        function isConfigEnabled(value) {
+            return value === true || value === 'true' || value === 1 || value === '1';
+        }
+
+        // 加载配置
+        async function loadConfig() {
+            try {
+                pluginConfig = await Bridge.getPluginConfig() || {};
+                console.log('Loaded plugin config:', JSON.stringify(pluginConfig));
+                
+                // 更新配置显示
+                document.getElementById('summaryConfig').textContent = 
+                    `每 ${pluginConfig.phase_summary_threshold || 50} 条消息`;
+                
+                const journalDisplay = isConfigEnabled(pluginConfig.enable_daily_journal);
+                document.getElementById('journalConfig').textContent = 
+                    journalDisplay ? '每天 03:00' : '已关闭';
+                document.getElementById('journalConfig').className = 
+                    journalDisplay ? 'value enabled' : 'value disabled';
+                
+                const vectorEnabled = isConfigEnabled(pluginConfig.enable_vectorization);
+                document.getElementById('vectorConfig').textContent = 
+                    vectorEnabled ? '已开启' : '已关闭';
+                document.getElementById('vectorConfig').className = 
+                    vectorEnabled ? 'value enabled' : 'value disabled';
+            } catch(e) {
+                console.error('Failed to load config:', e);
+            }
+        }
+        
+        // 检查连接状态
+        async function checkConnection() {
+            const badge = document.getElementById('statusBadge');
+            if (!pluginConfig.supabase_url || !pluginConfig.supabase_key) {
+                badge.textContent = '未配置';
+                badge.className = 'status-badge disconnected';
+                return;
+            }
+            
+            try {
+                // 尝试调用 stats 工具检查连接
+                const result = await Bridge.callTool('memory_get_stats', '{}');
+                // Bridge.callTool 返回的已经是 JS 对象，无需 JSON.parse
+                const data = typeof result === 'string' ? JSON.parse(result) : result;
+                if (data.success) {
+                    badge.textContent = '已连接';
+                    badge.className = 'status-badge connected';
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch(e) {
+                badge.textContent = '连接失败';
+                badge.className = 'status-badge disconnected';
+            }
+        }
+        
+        // 加载统计
+        async function loadStats() {
+            try {
+                const result = await Bridge.callTool('memory_get_stats', '{}');
+                const data = typeof result === 'string' ? JSON.parse(result) : result;
+                
+                if (data.success) {
+                    document.getElementById('summaryCount').textContent = data.data.totalSummaries || 0;
+                    document.getElementById('journalCount').textContent = data.data.totalJournals || 0;
+                }
+            } catch(e) {
+                console.error('Failed to load stats:', e);
+            }
+        }
+        
+        // 加载列表
+        async function loadList() {
+            const container = document.getElementById('listContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><div>加载中...</div></div>';
+            
+            try {
+                const type = currentTab === 'summaries' ? 'summary' : 'journal';
+                const result = await Bridge.callTool('memory_search', JSON.stringify({
+                    query: '',
+                    type: type,
+                    limit: 50
+                }));
+                
+                const data = typeof result === 'string' ? JSON.parse(result) : result;
+                
+                if (!data.success || !data.data || data.data.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">${type === 'summary' ? '📝' : '📔'}</div>
+                            <div class="text">暂无${type === 'summary' ? '阶段总结' : '日记'}数据</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = data.data.map(item => {
+                    if (currentTab === 'summaries') {
+                        return renderSummaryCard(item);
+                    } else {
+                        return renderJournalCard(item);
+                    }
+                }).join('');
+                
+            } catch(e) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">⚠️</div>
+                        <div class="text">加载失败: ${e.message}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        // 渲染总结卡片
+        function renderSummaryCard(item) {
+            const date = item.created_at ? new Date(item.created_at).toLocaleString('zh-CN') : '未知时间';
+            const content = (item.summary || '').substring(0, 150);
+            const vectorBadge = item.vectorized ? '<span class="vector-badge">🔍 已向量化</span>' : '';
+            
+            return `
+                <div class="summary-card" onclick="showDetail('summary', '${item.id}', '${escapeHtml(item.summary || '')}')">
+                    <div class="header-row">
+                        <span class="badge summary">阶段总结</span>
+                        <span class="date">${date}</span>
+                    </div>
+                    <div class="content">${escapeHtml(content)}${content.length >= 150 ? '...' : ''}</div>
+                    <div class="footer">
+                        <span class="meta">${item.message_count || 0} 条消息</span>
+                        ${vectorBadge}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 渲染日记卡片
+        function renderJournalCard(item) {
+            const date = item.journal_date || '未知日期';
+            const content = (item.content || '').substring(0, 150);
+            const vectorBadge = item.vectorized ? '<span class="vector-badge">🔍 已向量化</span>' : '';
+            
+            return `
+                <div class="summary-card" onclick="showDetail('journal', '${item.id}', '${escapeHtml(item.content || '')}')">
+                    <div class="header-row">
+                        <span class="badge journal">每日日记</span>
+                        <span class="date">${date}</span>
+                    </div>
+                    <div class="content">${escapeHtml(content)}${content.length >= 150 ? '...' : ''}</div>
+                    <div class="footer">
+                        <span class="meta">${item.assistant_id || '默认助手'}</span>
+                        ${vectorBadge}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 切换标签
+        function switchTab(tab, el) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            loadList();
+        }
+        
+        // 刷新数据
+        async function refreshData() {
+            await checkConnection();
+            await loadStats();
+            await loadList();
+        }
+        
+        // 手动生成日记
+        async function manualJournal() {
+            if (!confirm('生成昨天的日记？')) return;
+            
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '⏳ 生成中...';
+            
+            try {
+                const result = await Bridge.callTool('memory_manual_journal', '{}');
+                const data = typeof result === 'string' ? JSON.parse(result) : result;
+                
+                if (data.success) {
+                    alert(data.message);
+                    await loadStats();
+                    if (currentTab === 'journals') await loadList();
+                } else {
+                    alert('失败: ' + data.error);
+                }
+            } catch(e) {
+                alert('错误: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📔 生成昨日日记';
+            }
+        }
+        
+        // 显示详情
+        function showDetail(type, id, content) {
+            document.getElementById('modalTitle').textContent = 
+                type === 'summary' ? '阶段总结详情' : '日记详情';
+            document.getElementById('modalContent').textContent = content;
+            document.getElementById('detailModal').classList.add('show');
+        }
+        
+        // 关闭模态框
+        function hideModal() {
+            document.getElementById('detailModal').classList.remove('show');
+        }
+        
+        function closeModal(e) {
+            if (e.target === e.currentTarget) hideModal();
+        }
+        
+        // HTML 转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // 等待 Bridge 初始化完成后再启动
+        let bridgeInitAttempts = 0;
+        const MAX_BRIDGE_INIT_ATTEMPTS = 100; // 最多等待 5 秒
+        
+        function waitForBridgeAndInit() {
+            bridgeInitAttempts++;
+            if (typeof Bridge !== 'undefined' && Bridge.getPluginConfig) {
+                console.log('Bridge initialized, starting...');
+                init();
+            } else if (bridgeInitAttempts < MAX_BRIDGE_INIT_ATTEMPTS) {
+                setTimeout(waitForBridgeAndInit, 50);
+            } else {
+                console.error('Bridge failed to initialize after maximum attempts');
+                // 显示错误状态
+                document.getElementById('statusBadge').textContent = 'Bridge 初始化失败';
+                document.getElementById('statusBadge').className = 'status-badge disconnected';
+            }
+        }
+        
+        // 立即开始等待，同时也监听 DOMContentLoaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', waitForBridgeAndInit);
+        } else {
+            waitForBridgeAndInit();
+        }
+    </script>
+</body>
+</html>

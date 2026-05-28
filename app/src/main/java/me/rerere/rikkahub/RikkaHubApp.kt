@@ -31,6 +31,7 @@ import me.rerere.rikkahub.di.viewModelModule
 import me.rerere.rikkahub.plugin.di.pluginModule
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.service.DailySummaryService
 import me.rerere.rikkahub.data.service.ProactiveMessageService
 import me.rerere.rikkahub.data.service.SupabaseSyncService
 import me.rerere.rikkahub.service.WebServerService
@@ -98,6 +99,9 @@ class RikkaHubApp : Application() {
         // Reschedule Supabase sync alarm if enabled
         rescheduleSupabaseSyncIfEnabled()
 
+        // Reschedule daily_cron alarm if plugins need it
+        rescheduleDailyCronIfEnabled()
+
         // Increment launch count
         incrementLaunchCount()
 
@@ -152,6 +156,10 @@ class RikkaHubApp : Application() {
 
     private fun rescheduleSupabaseSyncIfEnabled() {
         SupabaseSyncService.rescheduleIfEnabled(this)
+    }
+
+    private fun rescheduleDailyCronIfEnabled() {
+        DailySummaryService.rescheduleIfEnabled(this)
     }
 
     private fun startWebServerIfEnabled() {

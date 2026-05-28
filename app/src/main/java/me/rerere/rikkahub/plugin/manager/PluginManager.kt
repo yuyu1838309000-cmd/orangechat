@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import me.rerere.rikkahub.data.service.DailySummaryService
 import me.rerere.rikkahub.plugin.loader.PluginLoader
 import me.rerere.rikkahub.plugin.model.PluginInfo
 import me.rerere.rikkahub.plugin.repository.PluginRepository
@@ -76,6 +77,9 @@ class PluginManager(
                     loadPlugin(plugin)
                 }
             }
+
+            // 5. 更新 daily_cron 调度（插件加载后可能有新的 daily_cron 钩子）
+            DailySummaryService.rescheduleIfEnabled(context)
         } finally {
             _isLoading.value = false
         }
@@ -173,6 +177,9 @@ class PluginManager(
         
         // 更新状态
         updatePluginState(pluginId) { it.copy(isEnabled = enabled) }
+
+        // 更新 daily_cron 调度（启用/禁用可能影响 daily_cron 钩子）
+        DailySummaryService.rescheduleIfEnabled(context)
     }
 
     /**

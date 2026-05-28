@@ -158,6 +158,46 @@ class PluginLoader(
     }
 
     /**
+     * 触发插件事件
+     * 遍历所有已加载插件，找到监听指定事件的钩子并调用对应的处理函数
+     * @param event 事件名称，如 "message_sent", "message_received", "daily_cron"
+     * @param params 事件参数
+     */
+    suspend fun callEvent(event: String, params: JsonElement) {
+        withContext(pluginDispatcher) {
+            for (plugin in loadedPlugins.values) {
+                if (!plugin.info.isEnabled) continue
+
+                val matchingHooks = plugin.info.manifest.hooks.filter { it.event == event }
+                for (hook in matchingHooks) {
+                    try {
+                        if (plugin.sandbox.hasFunction(hook.handler)) {
+                            plugin.sandbox.callFunction(hook.handler, params)
+                            Log.d(TAG, "Event '$event' handled by plugin ${plugin.id}.${hook.handler}")
+                        } else {
+                            Log.w(TAG, "Hook handler '${hook.handler}' not found in plugin ${plugin.id}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to handle event '$event' in plugin ${plugin.id}.${hook.handler}", e)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 获取所有声明了 daily_cron 钩子的插件
+     * 用于定时任务调度
+     */
+    fun getPluginsWithDailyCron(): List<Pair<LoadedPlugin, String>> {
+        return loadedPlugins.values.filter { it.info.isEnabled }.flatMap { plugin ->
+            plugin.info.manifest.hooks
+                .filter { it.event == "daily_cron" }
+                .map { hook -> plugin to hook.handler }
+        }
+    }
+
+    /**
      * 卸载所有插件
      */
     suspend fun unloadAll() = withContext(pluginDispatcher) {

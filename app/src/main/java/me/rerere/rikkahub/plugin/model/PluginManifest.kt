@@ -81,7 +81,14 @@ data class PluginManifest(
      * App 渲染为原生 Compose Material 3 UI
      * 当此字段非空时，优先于 customPageWebView 渲染
      */
-    val ui: PluginUIDeclaration? = null
+    val ui: PluginUIDeclaration? = null,
+
+    /**
+     * 插件事件钩子声明
+     * 插件通过此字段声明需要监听的事件和对应的处理函数
+     * 支持的事件: message_sent, message_received, daily_cron
+     */
+    val hooks: List<PluginHook> = emptyList()
 )
 
 /**
@@ -154,7 +161,8 @@ data class PluginConfigField(
     val name: String,
     
     /**
-     * 配置项类型：string, number, boolean, select, password
+     * 配置项类型：string, number, boolean, select, password, model
+     * model 类型会显示模型选择器，保存选中模型的 ID
      */
     val type: String,
     
@@ -203,4 +211,27 @@ data class ConfigOption(
      * 显示标签
      */
     val label: String
+)
+
+/**
+ * 插件事件钩子
+ */
+@Serializable
+data class PluginHook(
+    /**
+     * 事件名称
+     * 支持: "message_sent", "message_received", "daily_cron"
+     */
+    val event: String,
+
+    /**
+     * 处理函数名称（插件导出的函数名）
+     */
+    val handler: String,
+
+    /**
+     * Cron 表达式（仅 daily_cron 事件使用）
+     * 例如: "0 3 * * *" 表示每天凌晨3点
+     */
+    val schedule: String? = null
 )

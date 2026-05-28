@@ -34,14 +34,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.ArrowLeft01
 import me.rerere.rikkahub.plugin.data.PluginDataStore
+import me.rerere.rikkahub.plugin.loader.PluginLoader
+import me.rerere.rikkahub.plugin.loader.LoadedPlugin
 import me.rerere.rikkahub.plugin.manager.PluginManager
 import me.rerere.rikkahub.plugin.model.PluginInfo
+import me.rerere.rikkahub.plugin.repository.PluginRepository
 import org.json.JSONArray
+import org.koin.compose.koinInject
 import java.io.File
 
 private const val TAG = "PluginWebViewPage"
@@ -58,6 +66,8 @@ fun PluginWebViewPage(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val pluginLoader = koinInject<PluginLoader>()
+    val pluginRepository = koinInject<PluginRepository>()
     var webView by remember { mutableStateOf<WebView?>(null) }
     var pendingImageCallback by remember { mutableStateOf<String?>(null) }
 
@@ -141,7 +151,9 @@ fun PluginWebViewPage(
                             webViewClient = PluginWebViewClient(
                                 pluginInfo = pluginInfo,
                                 dataStore = dataStore,
+                                pluginLoader = pluginLoader,
                                 pluginManager = pluginManager,
+                                pluginRepository = pluginRepository,
                                 onPickImage = { callbackId ->
                                     pendingImageCallback = callbackId
                                     pickImageLauncher.launch(
@@ -189,7 +201,9 @@ fun PluginWebViewPage(
 private class PluginWebViewClient(
     private val pluginInfo: PluginInfo,
     private val dataStore: PluginDataStore,
+    private val pluginLoader: PluginLoader,
     private val pluginManager: PluginManager,
+    private val pluginRepository: PluginRepository,
     private val onPickImage: (callbackId: String) -> Unit,
     private val onClose: () -> Unit
 ) : WebViewClient() {
@@ -221,13 +235,45 @@ private class PluginWebViewClient(
 
         when (method) {
             "getPluginConfig" -> {
-                val config = pluginInfo.config
-                val jsonObj = JsonObject(config.mapValues { it.value })
-                val result = json.encodeToString(JsonObject.serializer(), jsonObj)
-                webView.post {
-                    webView.evaluateJavascript(
-                        "window.__bridgeResult('${params["callbackId"]}', $result);", null
-                    )
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        // 使用注入的单例 repository，避免 DataStore 多实例冲突
+                        val savedConfig = pluginRepository.getPluginConfig(pluginInfo.manifest.id)
+                        val mergedConfig = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+                        
+                        // 合并 manifest 默认值和已保存配置
+                        pluginInfo.manifest.config.forEach { field ->
+                            if (savedConfig.containsKey(field.name)) {
+                                mergedConfig[field.name] = savedConfig[field.name]!!
+                            } else if (field.default != null) {
+                                mergedConfig[field.name] = field.default
+                            }
+                        }
+                        
+                        // 合入其他已保存但不在 manifest 配置定义中的值
+                        savedConfig.forEach { (key, value) ->
+                            if (!mergedConfig.containsKey(key)) {
+                                mergedConfig[key] = value
+                            }
+                        }
+                        
+                        val jsonObj = JsonObject(mergedConfig)
+                        val result = json.encodeToString(JsonObject.serializer(), jsonObj)
+                        Log.d(TAG, "getPluginConfig for ${pluginInfo.manifest.id}: $result")
+                        webView.post {
+                            webView.evaluateJavascript(
+                                "window.__bridgeResult('${params["callbackId"]}', $result);", null
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to get plugin config", e)
+                        // 返回空配置作为 fallback
+                        webView.post {
+                            webView.evaluateJavascript(
+                                "window.__bridgeResult('${params["callbackId"]}', {});", null
+                            )
+                        }
+                    }
                 }
             }
 
@@ -361,6 +407,68 @@ private class PluginWebViewClient(
             "close" -> {
                 onClose()
             }
+            
+            "callTool" -> {
+                val toolName = params["toolName"] ?: ""
+                val toolParams = params["params"] ?: "{}"
+                CoroutineScope(Dispatchers.Main).launch {
+                    try {
+                        // 获取插件工具提供者并调用工具
+                        val result = callPluginTool(toolName, toolParams)
+                        webView.post {
+                            webView.evaluateJavascript(
+                                "window.__bridgeResult('${params["callbackId"]}', ${result});", null
+                            )
+                        }
+                    } catch (e: Exception) {
+                        val errorResult = """{"success":false,"error":"${e.message}"}"""
+                        webView.post {
+                            webView.evaluateJavascript(
+                                "window.__bridgeResult('${params["callbackId"]}', $errorResult);", null
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * 调用插件工具
+     * 通过查找包含该工具的插件并调用
+     */
+    private suspend fun callPluginTool(toolName: String, params: String): String {
+        return try {
+            // 查找包含该工具的插件
+            val loadedPlugin: LoadedPlugin? = pluginLoader.getAllLoadedPlugins().find { plugin: LoadedPlugin ->
+                plugin.info.manifest.tools.any { toolDef -> toolDef.name == toolName }
+            }
+            
+            if (loadedPlugin == null) {
+                return """{"success":false,"error":"Tool not found: $toolName"}"""
+            }
+            
+            // 解析参数
+            val jsonParams = Json.parseToJsonElement(params)
+            
+            // 调用工具
+            val result = pluginLoader.callTool(
+                pluginId = loadedPlugin.id,
+                toolName = toolName,
+                params = jsonParams
+            )
+            
+            // 返回结果
+            return result.fold(
+                onSuccess = { jsonElement: kotlinx.serialization.json.JsonElement ->
+                    Json.encodeToString(kotlinx.serialization.json.JsonElement.serializer(), jsonElement)
+                },
+                onFailure = { error: Throwable ->
+                    """{"success":false,"error":"${error.message}"}"""
+                }
+            )
+        } catch (e: Exception) {
+            """{"success":false,"error":"${e.message}"}"""
         }
     }
 }
@@ -428,6 +536,9 @@ private const val bridgeJavascript = """
         },
         pickImage: function() {
             return bridgeCall('pickImage', {});
+        },
+        callTool: function(toolName, params) {
+            return bridgeCall('callTool', {toolName: toolName, params: params || '{}'});
         },
         writeFile: function(fileName, base64Data) {
             return bridgeCall('writeFile', {fileName: fileName, data: base64Data});

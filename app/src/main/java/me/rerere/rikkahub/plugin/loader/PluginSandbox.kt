@@ -83,8 +83,8 @@ class PluginSandbox(
                 // 记忆库桥接函数 - 由原生代码注入
                 var __memoryBankBridge = null;
                 
-                // fetch(url) - 同步HTTP GET请求，返回响应文本
-                // 插件可直接调用 fetch("https://example.com") 获取响应内容
+                // fetch(url) - 同步HTTP请求，返回类浏览器Response对象
+                // 支持 response.json(), response.text(), response.ok, response.status 等
                 function fetch(url, options) {
                     if (!__nativeFetch) {
                         throw new Error("fetch is not available: native fetch not injected");
@@ -95,7 +95,16 @@ class PluginSandbox(
                     if (!result.success) {
                         throw new Error(result.error || "fetch failed");
                     }
-                    return result;
+                    // 构建类浏览器 Response 对象
+                    var response = {
+                        ok: result.ok,
+                        status: result.status,
+                        headers: result.headers,
+                        body: result.body,
+                        text: function() { return result.body; },
+                        json: function() { return JSON.parse(result.body); }
+                    };
+                    return response;
                 }
             """.trimIndent())
 
@@ -341,25 +350,26 @@ class PluginSandbox(
             val paramsJson = json.encodeToString(JsonElement.serializer(), params)
             
             // 调用函数并序列化结果
+            // 注意：不再额外包装 {success, data}，直接返回函数的原始返回值
+            // 插件函数自身负责返回合适的结果格式
             val callCode = """
                 (function() {
-                    var __result = null;
-                    var __error = null;
                     try {
                         var __ret = exports['$name']($paramsJson);
                         if (__ret && typeof __ret.then === 'function') {
-                            // Promise - 尝试同步解析
-                            __ret.then(function(v) { __result = v; }).catch(function(e) { __error = e; });
-                        } else {
-                            __result = __ret;
+                            // Promise - 尝试同步解析（通常不会发生，因为已预处理移除async）
+                            var __resolved = null;
+                            var __rejected = null;
+                            __ret.then(function(v) { __resolved = v; }).catch(function(e) { __rejected = e; });
+                            if (__rejected) {
+                                return JSON.stringify({success: false, error: __rejected.message || String(__rejected)});
+                            }
+                            return JSON.stringify(__resolved);
                         }
+                        return JSON.stringify(__ret);
                     } catch(e) {
-                        __error = e;
+                        return JSON.stringify({success: false, error: e.message || String(e)});
                     }
-                    if (__error) {
-                        return JSON.stringify({success: false, error: __error.message || String(__error)});
-                    }
-                    return JSON.stringify({success: true, data: __result});
                 })()
             """.trimIndent()
             

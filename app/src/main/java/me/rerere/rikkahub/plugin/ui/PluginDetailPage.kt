@@ -14,6 +14,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -23,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,8 +33,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -40,15 +47,20 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import me.rerere.ai.provider.ModelType
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.ArrowLeft01
 import me.rerere.hugeicons.stroke.ArrowRight01
 import me.rerere.hugeicons.stroke.CheckmarkCircle01
 import me.rerere.hugeicons.stroke.Database02
+import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.plugin.model.PluginConfigField
 import me.rerere.rikkahub.plugin.model.PluginInfo
 import me.rerere.rikkahub.plugin.model.PluginToolDefinition
+import me.rerere.rikkahub.ui.components.ai.ModelSelector
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
+import kotlin.uuid.Uuid
 
 /**
  * 插件详情页面
@@ -107,6 +119,12 @@ fun PluginDetailPage(
                 .verticalScroll(rememberScrollState())
         ) {
             PluginInfoSection(plugin)
+
+            // Supabase 记忆库插件的数据库初始化说明
+            if (plugin.manifest.id == "com.orangechat.plugin.supabase_memory") {
+                Spacer(modifier = Modifier.height(16.dp))
+                SupabaseSetupInstructions()
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -261,6 +279,7 @@ private fun ConfigField(
         "boolean" -> BooleanConfigField(field, value, onValueChange)
         "select" -> SelectConfigField(field, value, onValueChange)
         "password" -> StringConfigField(field, value, onValueChange, isPassword = true)
+        "model" -> ModelConfigField(field, value, onValueChange)
         else -> StringConfigField(field, value, onValueChange)
     }
 }
@@ -343,5 +362,258 @@ private fun SelectConfigField(
             supportingText = { Text("可用选项: $optionsText") },
             modifier = Modifier.fillMaxWidth()
         )
+    }
+}
+
+@Composable
+private fun ModelConfigField(
+    field: PluginConfigField,
+    value: JsonElement?,
+    onValueChange: (JsonElement?) -> Unit
+) {
+    val settingsStore: SettingsStore = koinInject()
+    val settings by settingsStore.settingsFlow.collectAsStateWithLifecycle()
+    val providers = settings.providers
+    
+    // 解析当前选中的模型 ID
+    val currentModelId = remember(value) {
+        val v = value as? JsonPrimitive
+        val modelIdStr = v?.contentOrNull
+        try {
+            modelIdStr?.let { Uuid.parse(it) }
+        } catch (_: Exception) {
+            null
+        }
+    }
+    
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Text(text = field.label, style = MaterialTheme.typography.bodyLarge)
+        if (field.description != null) {
+            Text(text = field.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        ModelSelector(
+            modelId = currentModelId,
+            providers = providers,
+            type = ModelType.CHAT,
+            modifier = Modifier.fillMaxWidth(),
+            onSelect = { model ->
+                // 保存选中的模型 ID 为字符串
+                onValueChange(JsonPrimitive(model.id.toString()))
+            }
+        )
+    }
+}
+
+/**
+ * Supabase 记忆库插件的数据库初始化说明
+ */
+@Composable
+private fun SupabaseSetupInstructions() {
+    val clipboardManager: ClipboardManager = LocalClipboardManager.current
+    var copiedIndex by remember { mutableStateOf(-1) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "数据库初始化步骤",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = "首次使用需要在 Supabase 数据库中创建表。请按以下步骤操作：",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // 步骤 1
+            Text(
+                text = "步骤 1：创建 chat_messages 表",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            val sql1 = """create table chat_messages (
+  id uuid default gen_random_uuid() primary key,
+  assistant_id text not null,
+  conversation_id text not null,
+  role text not null,
+  content text not null,
+  created_at timestamp with time zone default now()
+);"""
+            
+            CopyableCodeBlock(
+                code = sql1,
+                index = 0,
+                copiedIndex = copiedIndex,
+                onCopy = { idx, text ->
+                    clipboardManager.setText(AnnotatedString(text))
+                    copiedIndex = idx
+                }
+            )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // 步骤 2
+            Text(
+                text = "步骤 2：创建 memory_summaries 表",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            val sql2 = """create table memory_summaries (
+  id uuid default gen_random_uuid() primary key,
+  assistant_id text not null,
+  conversation_id text not null,
+  summary text not null,
+  message_count integer default 0,
+  period_start timestamp with time zone,
+  period_end timestamp with time zone,
+  vectorized boolean default false,
+  embedding vector(1536),
+  created_at timestamp with time zone default now()
+);"""
+            
+            CopyableCodeBlock(
+                code = sql2,
+                index = 1,
+                copiedIndex = copiedIndex,
+                onCopy = { idx, text ->
+                    clipboardManager.setText(AnnotatedString(text))
+                    copiedIndex = idx
+                }
+            )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // 步骤 3
+            Text(
+                text = "步骤 3：创建 daily_journals 表",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            val sql3 = """create table daily_journals (
+  id uuid default gen_random_uuid() primary key,
+  assistant_id text not null,
+  journal_date date not null,
+  content text not null,
+  vectorized boolean default false,
+  embedding vector(1536),
+  created_at timestamp with time zone default now()
+);"""
+            
+            CopyableCodeBlock(
+                code = sql3,
+                index = 2,
+                copiedIndex = copiedIndex,
+                onCopy = { idx, text ->
+                    clipboardManager.setText(AnnotatedString(text))
+                    copiedIndex = idx
+                }
+            )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // 步骤 4
+            Text(
+                text = "步骤 4：启用向量扩展（可选）",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            val sql4 = "create extension if not exists vector;"
+            
+            CopyableCodeBlock(
+                code = sql4,
+                index = 3,
+                copiedIndex = copiedIndex,
+                onCopy = { idx, text ->
+                    clipboardManager.setText(AnnotatedString(text))
+                    copiedIndex = idx
+                }
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = "提示：在 Supabase Dashboard 的 SQL Editor 中执行以上 SQL。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+/**
+ * 可复制的代码块
+ */
+@Composable
+private fun CopyableCodeBlock(
+    code: String,
+    index: Int,
+    copiedIndex: Int,
+    onCopy: (Int, String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "SQL",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                TextButton(
+                    onClick = { onCopy(index, code) },
+                    modifier = Modifier.padding(0.dp)
+                ) {
+                    Text(
+                        text = if (copiedIndex == index) "已复制 ✓" else "复制",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                text = code,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }

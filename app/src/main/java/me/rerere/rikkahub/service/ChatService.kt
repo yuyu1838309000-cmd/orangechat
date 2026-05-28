@@ -32,6 +32,8 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.ReasoningLevel
@@ -61,6 +63,7 @@ import me.rerere.rikkahub.data.ai.tools.createSearchTools
 import me.rerere.rikkahub.data.ai.tools.createSkillTools
 import me.rerere.rikkahub.data.files.SkillManager
 import me.rerere.rikkahub.data.service.MemoryBankService
+import me.rerere.rikkahub.plugin.loader.PluginLoader
 import me.rerere.rikkahub.plugin.provider.PluginToolProvider
 import me.rerere.rikkahub.data.ai.transformers.Base64ImageToLocalFileTransformer
 import me.rerere.rikkahub.data.ai.transformers.DocumentAsPromptTransformer
@@ -143,6 +146,7 @@ class ChatService(
     private val skillManager: SkillManager,
     private val pluginToolProvider: PluginToolProvider,
     private val memoryBankService: MemoryBankService,
+    private val pluginLoader: PluginLoader,
 ) {
     // 统一会话管理
     private val sessions = ConcurrentHashMap<Uuid, ConversationSession>()
@@ -342,6 +346,24 @@ class ChatService(
                     ).toMessageNode(),
                 )
                 saveConversation(conversationId, newConversation)
+
+                // 触发 message_sent 事件钩子
+                try {
+                    val eventData = JsonObject(
+                        mapOf(
+                            "assistant_id" to JsonPrimitive(assistant.id.toString()),
+                            "conversation_id" to JsonPrimitive(conversationId.toString()),
+                            "message" to JsonPrimitive(processedContent.mapNotNull { part ->
+                                if (part is UIMessagePart.Text) part.text else null
+                            }.joinToString("\n")),
+                            "role" to JsonPrimitive("user"),
+                            "timestamp" to JsonPrimitive(System.currentTimeMillis())
+                        )
+                    )
+                    pluginLoader.callEvent("message_sent", eventData)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to trigger message_sent event", e)
+                }
 
                 // 开始补全
                 if (answer) {
@@ -622,6 +644,23 @@ class ChatService(
         }.onSuccess {
             val finalConversation = getConversationFlow(conversationId).value
             saveConversation(conversationId, finalConversation)
+
+            // 触发 message_received 事件钩子
+            try {
+                val lastAssistantMessage = finalConversation.currentMessages.lastOrNull { it.role == MessageRole.ASSISTANT }
+                val eventData = JsonObject(
+                    mapOf(
+                        "assistant_id" to JsonPrimitive(assistant.id.toString()),
+                        "conversation_id" to JsonPrimitive(conversationId.toString()),
+                        "message" to JsonPrimitive(lastAssistantMessage?.toText() ?: ""),
+                        "role" to JsonPrimitive("assistant"),
+                        "timestamp" to JsonPrimitive(System.currentTimeMillis())
+                    )
+                )
+                pluginLoader.callEvent("message_received", eventData)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to trigger message_received event", e)
+            }
 
             // 自动存储消息到记忆库 & 检查阶段总结
             launchWithConversationReference(conversationId) {
