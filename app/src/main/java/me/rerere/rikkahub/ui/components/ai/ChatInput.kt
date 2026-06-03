@@ -108,6 +108,7 @@ import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.QuickMessage
 import me.rerere.rikkahub.ui.components.ui.KeepScreenOn
+import me.rerere.rikkahub.ui.components.ui.toComposeColor
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionManager
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionRecordAudio
 import me.rerere.rikkahub.ui.components.ui.permission.rememberPermissionState
@@ -497,8 +498,8 @@ fun ChatInput(
                 tonalElevation = 0.dp,
                 // When background image is set, make surface transparent so image is visible
                 color = if (inputBgBitmap != null) Color.Transparent
-                    else if (settings.displaySetting.enableBlurEffect) Color.Transparent 
-                    else hazeTintColor,
+                    else if (settings.displaySetting.enableBlurEffect) Color.Transparent
+                    else settings.displaySetting.inputFieldColor?.let { it.toComposeColor() } ?: hazeTintColor,
             ) {
                 // Use Box so background image can match parent size
                 Box {

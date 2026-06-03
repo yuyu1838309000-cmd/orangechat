@@ -613,6 +613,15 @@ data class DisplaySetting(
     val drawerBackgroundPath: String = "",
     // 侧边栏元素透明度
     val drawerItemAlpha: Float = 1f,
+    // 颜色自定义
+    val chatTextColor: Long? = null,
+    val globalTextColor: Long? = null,
+    val userBubbleColor: Long? = null,
+    val assistantBubbleColor: Long? = null,
+    val thinkingBubbleColor: Long? = null,
+    val chatBackgroundColor: Long? = null,
+    val primaryColor: Long? = null,
+    val inputFieldColor: Long? = null,
 )
 
 @Serializable

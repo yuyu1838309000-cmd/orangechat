@@ -8,16 +8,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import me.rerere.rikkahub.data.datastore.Settings
+import me.rerere.rikkahub.ui.components.ui.toComposeColor
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 
 @Composable
 fun AssistantBackground(setting: Settings) {
     val assistant = setting.getCurrentAssistant()
+    val chatBackgroundColor = setting.displaySetting.chatBackgroundColor?.let { it.toComposeColor() }
+
     if (assistant.background != null) {
-        val backgroundColor = MaterialTheme.colorScheme.background
+        // 背景图优先
+        val backgroundColor = chatBackgroundColor ?: MaterialTheme.colorScheme.background
         val backgroundOpacity = assistant.backgroundOpacity.coerceIn(0f, 1f)
         Box {
             AsyncImage(
@@ -43,5 +48,12 @@ fun AssistantBackground(setting: Settings) {
                     )
             )
         }
+    } else if (chatBackgroundColor != null) {
+        // 无背景图时使用自定义聊天背景色
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(chatBackgroundColor)
+        )
     }
 }

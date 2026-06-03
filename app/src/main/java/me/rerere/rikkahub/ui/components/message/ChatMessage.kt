@@ -100,6 +100,7 @@ import me.rerere.rikkahub.ui.components.ui.ChainOfThought
 import me.rerere.rikkahub.ui.components.ui.Favicon
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.modifier.shimmer
+import me.rerere.rikkahub.ui.components.ui.toComposeColor
 import me.rerere.rikkahub.ui.context.LocalSettings
 import me.rerere.rikkahub.ui.theme.extendColors
 import me.rerere.rikkahub.data.datastore.ChatFontFamily
@@ -138,6 +139,7 @@ fun ChatMessage(
     val settings = LocalSettings.current.displaySetting
     val textStyle = LocalTextStyle.current.copy(
         fontSize = LocalTextStyle.current.fontSize * settings.fontSizeRatio,
+        color = settings.chatTextColor?.let { it.toComposeColor() } ?: Color.Unspecified,
         lineHeight = LocalTextStyle.current.lineHeight * settings.fontSizeRatio,
         fontFamily = when (settings.chatFontFamily) {
             ChatFontFamily.DEFAULT -> FontFamily.Default
@@ -387,7 +389,7 @@ private fun MessagePartsBlock(
                                     Surface(
                                         modifier = Modifier.animateContentSize(),
                                         shape = RoundedCornerShape(16.dp),
-                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = bubbleAlpha),
+                                        color = (settings.displaySetting.userBubbleColor?.let { it.toComposeColor() } ?: MaterialTheme.colorScheme.primaryContainer).copy(alpha = bubbleAlpha),
                                         onClick = { onUserMessageClick?.invoke() },
                                     ) {
                                         Column(modifier = Modifier.padding(8.dp)) {
@@ -406,7 +408,7 @@ private fun MessagePartsBlock(
                                         Surface(
                                             modifier = Modifier.animateContentSize(),
                                             shape = RoundedCornerShape(16.dp),
-                                            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = bubbleAlpha),
+                                            color = (settings.displaySetting.assistantBubbleColor?.let { it.toComposeColor() } ?: MaterialTheme.colorScheme.surfaceContainerHigh).copy(alpha = bubbleAlpha),
                                         ) {
                                             Column(modifier = Modifier.padding(8.dp)) {
                                                 MarkdownBlock(
