@@ -1,6 +1,7 @@
 package me.rerere.rikkahub.utils
 
 import android.content.Context
+import android.system.Os
 import android.util.Log
 import java.io.File
 import java.io.FileOutputStream
@@ -203,6 +204,7 @@ object RuntimeExtractor {
             context.assets.open(assetPath).use { assetStream ->
                 GZIPInputStream(assetStream).use { gzipStream ->
                     // 简单的 tar 解析实现
+                    val symlinks = mutableListOf<Pair<File, String>>()
                     val buffer = ByteArray(512)
                     while (true) {
                         val headerRead = readFully(gzipStream, buffer, 512)
@@ -272,15 +274,36 @@ object RuntimeExtractor {
                                 }
                             }
                             '2' -> {
-                                // 符号链接 - 在 Android 上可能不支持，创建空文件
-                                targetFile.parentFile?.mkdirs()
-                                targetFile.createNewFile()
+                                // 符号链接 - 读取链接目标，延迟处理
+                                val linkTargetBytes = buffer.copyOfRange(157, 257)
+                                val linkTarget = String(linkTargetBytes).trimEnd('\u0000')
+                                symlinks.add(Pair(targetFile, linkTarget))
                                 // 跳过数据块
                                 skipBlocks(gzipStream, fileSize)
                             }
                             else -> {
                                 // 其他类型，跳过数据块
                                 skipBlocks(gzipStream, fileSize)
+                            }
+                        }
+                    }
+
+                    // 处理符号链接
+                    for ((linkFile, linkTarget) in symlinks) {
+                        try {
+                            Os.symlink(linkTarget, linkFile.absolutePath)
+                            Log.d(TAG, "Created symlink: ${linkFile.name} -> $linkTarget")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to create symlink: ${linkFile.name} -> $linkTarget: ${e.message}")
+                            // 备选方案：如果链接目标存在，复制文件
+                            try {
+                                val targetSource = File(linkFile.parentFile, linkTarget)
+                                if (targetSource.exists()) {
+                                    targetSource.copyTo(linkFile, overwrite = true)
+                                    Log.d(TAG, "Copied ${targetSource.name} to ${linkFile.name} as symlink fallback")
+                                }
+                            } catch (copyEx: Exception) {
+                                Log.w(TAG, "Fallback copy also failed for ${linkFile.name}: ${copyEx.message}")
                             }
                         }
                     }

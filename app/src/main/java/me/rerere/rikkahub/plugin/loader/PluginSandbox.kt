@@ -17,6 +17,7 @@ import kotlinx.serialization.json.contentOrNull
 import me.rerere.rikkahub.data.service.MemoryBankService
 import me.rerere.rikkahub.plugin.data.PluginDataStore
 import me.rerere.rikkahub.plugin.webview.MusicPlayerService
+import me.rerere.rikkahub.utils.RuntimeExtractor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
