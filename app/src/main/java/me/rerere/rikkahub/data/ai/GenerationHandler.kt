@@ -78,6 +78,7 @@ class GenerationHandler(
         maxSteps: Int = 256,
         processingStatus: MutableStateFlow<String?> = MutableStateFlow(null),
         conversationSystemPrompt: String? = null,
+        workspaceCwd: String? = null,
         pluginPromptInjections: List<String> = emptyList(),
     ): Flow<GenerationChunk> = flow {
         val provider = model.findProvider(settings.providers) ?: error("Provider not found")
@@ -157,6 +158,7 @@ class GenerationHandler(
                     stream = assistant.streamOutput,
                     processingStatus = processingStatus,
                     conversationSystemPrompt = conversationSystemPrompt,
+                    workspaceCwd = workspaceCwd,
                 )
                 messages = messages.visualTransforms(
                     transformers = outputTransformers,
@@ -348,6 +350,7 @@ class GenerationHandler(
         stream: Boolean,
         processingStatus: MutableStateFlow<String?> = MutableStateFlow(null),
         conversationSystemPrompt: String? = null,
+        workspaceCwd: String? = null,
     ) {
         val internalMessages = buildList {
             val system = buildString {
@@ -408,6 +411,7 @@ class GenerationHandler(
             assistant = assistant,
             settings = settings,
             processingStatus = processingStatus,
+            workspaceCwd = workspaceCwd,
         )
 
         var messages: List<UIMessage> = messages

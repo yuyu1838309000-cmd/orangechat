@@ -25,6 +25,8 @@ data class Conversation(
     @Serializable(with = InstantSerializer::class)
     val updateAt: Instant = Instant.now(),
     val customSystemPrompt: String? = null,
+    // Absolute path inside the workspace rootfs
+    val workspaceCwd: String? = null,
     @Transient
     val newConversation: Boolean = false
 ) {

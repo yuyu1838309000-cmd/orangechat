@@ -95,7 +95,8 @@ val appModule = module {
             filesManager = get(),
             skillManager = get(),
             pluginToolProvider = get(),
-            pluginLoader = get()
+            pluginLoader = get(),
+            workspaceRepository = get(),
         )
     }
 
