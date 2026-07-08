@@ -4,12 +4,15 @@ import android.app.Application
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -207,13 +210,67 @@ class ChatService(
         }
     }
 
+    // 标记 lifecycleObserver 是否已真正 addObserver 成功。
+    // 用于规避 init 的 post 任务还没执行就被 cleanup() 的竞态:
+    // 若 addObserver 是异步派发到主线程, cleanup 可能在它之前执行 removeObserver,
+    // 此时 observer 实际没挂上(后续 ON_START/ON_STOP 回调丢失, 前后台状态失效)。
+    private val observerAdded = AtomicBoolean(false)
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    // 真正执行 addObserver 的 Runnable, 保存引用供 cleanup 精确取消 pending 的 post,
+    // 避免用 removeCallbacksAndMessages(null) 误删同 handler 上其它任务。
+    private val addObserverRunnable = Runnable {
+        try {
+            ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleObserver)
+            observerAdded.set(true)
+            Log.i(TAG, "Lifecycle observer added")
+        } catch (e: Exception) {
+            // 例如 ProcessLifecycleOwner 尚未就绪等异常边界, 记日志不崩
+            Log.e(TAG, "Failed to add lifecycle observer", e)
+        }
+    }
+
     init {
-        // 添加生命周期观察者
-        ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleObserver)
+        // 添加生命周期观察者。ProcessLifecycleOwner.get().lifecycle.addObserver
+        // 强制要求主线程调用。正常情况下 ChatService 由 RikkaHubApp.onCreate 的
+        // 预热调用在主线程构造, 这里直接执行即可。这里加线程判断 + 派发, 是给
+        // "万一未来又出现一个在后台线程首次访问 ChatService 的新入口"兜底:
+        // 不让它直接崩, 而是把 addObserver 派发到主线程异步执行。
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            addObserverRunnable.run()
+        } else {
+            Log.w(TAG, "ChatService constructed off main thread; dispatching addObserver to main thread")
+            mainHandler.post(addObserverRunnable)
+        }
     }
 
     fun cleanup() = runCatching {
-        ProcessLifecycleOwner.get().lifecycle.removeObserver(lifecycleObserver)
+        // 同样在主线程操作 observer, 与 addObserver 的执行线程保持一致,
+        // 规避"post 中的 add 还没执行, 这里先 remove"导致 observer 实际没挂上的竞态。
+        val removeObserverRunnable = Runnable {
+            try {
+                if (observerAdded.get()) {
+                    ProcessLifecycleOwner.get().lifecycle.removeObserver(lifecycleObserver)
+                    observerAdded.set(false)
+                    Log.i(TAG, "Lifecycle observer removed")
+                } else {
+                    // observer 还没成功 add, 说明 init 的 post 任务可能尚未执行;
+                    // 精确取消 pending 的 add, 避免它在 cleanup 之后才跑导致 observer 残留挂载。
+                    // 注: Handler.removeCallbacks 返回 void, 无法据返回值判断是否真有任务被取消,
+                    // 这里只是尽力取消, 取消不到也无害(任务里会因 observerAdded 仍为 false 而照常 add)。
+                    mainHandler.removeCallbacks(addObserverRunnable)
+                    Log.i(TAG, "Cancelled pending lifecycle observer add (cleanup before add)")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to remove lifecycle observer", e)
+            }
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            removeObserverRunnable.run()
+        } else {
+            mainHandler.post(removeObserverRunnable)
+            Unit
+        }
         sessions.values.forEach { it.cleanup() }
         sessions.clear()
     }

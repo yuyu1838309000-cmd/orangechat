@@ -36,6 +36,7 @@ import me.rerere.rikkahub.data.service.DeviceEventTrackingService
 import me.rerere.rikkahub.data.service.DiarySummaryService
 import me.rerere.rikkahub.data.service.ProactiveMessageService
 import me.rerere.rikkahub.data.service.SupabaseSyncService
+import me.rerere.rikkahub.service.ChatService
 import me.rerere.rikkahub.service.WebServerService
 import me.rerere.rikkahub.utils.CrashHandler
 import me.rerere.rikkahub.utils.DatabaseUtil
@@ -71,6 +72,21 @@ class RikkaHubApp : Application() {
             modules(appModule, viewModelModule, dataSourceModule, repositoryModule, pluginModule)
         }
         this.createNotificationChannel()
+
+        // 预热 ChatService 单例: 强制在主线程(Application.onCreate 由 Android 保证
+        // 在主线程执行, 且先于同一进程内任何 Service/BroadcastReceiver/Activity 回调)
+        // 解析并构造 ChatService。原因: ChatService.init 里有 ProcessLifecycleOwner
+        // 的 addObserver, 该 API 强制要求主线程; 而 ChatService 是 Koin 普通 single
+        // (懒汉式), 默认在"首次注入它的调用者所在线程"构造。进程冷启动后, 若第一个
+        // 访问 chatService 的是 ProactiveMessageTriggerService(它在自己的
+        // Dispatchers.IO 协程里首次访问), 就会在后台线程构造并抛
+        // "addObserver must be called on the main thread" 崩溃。这里预热后, 任何
+        // 后续入口(主动消息/语音通话/WebServer/新功能)拿到的都是已在主线程建好的现成单例。
+        // 必须放在 startWebServerIfEnabled() 之前, 因为后者会间接触发 WebServerManager
+        // -> chatService 解析链。
+        runCatching { get<ChatService>() }.onFailure { e ->
+            android.util.Log.e(TAG, "Failed to pre-warm ChatService singleton", e)
+        }
 
         // set cursor window size to 32MB
         DatabaseUtil.setCursorWindowSize(32 * 1024 * 1024)
