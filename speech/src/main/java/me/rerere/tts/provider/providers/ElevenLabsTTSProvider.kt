@@ -29,12 +29,20 @@ class ElevenLabsTTSProvider : TTSProvider<TTSProviderSetting.ElevenLabs> {
         request: TTSRequest
     ): Flow<AudioChunk> = flow {
         try {
+            // clamp 到 API 要求的 0..1 区间, 防止迁移/导入的旧设置超范围触发 400
+            val stability = providerSetting.stability.coerceIn(0f, 1f)
+            val similarityBoost = providerSetting.similarityBoost.coerceIn(0f, 1f)
+
             val requestBody = JSONObject().apply {
                 put("text", request.text)
                 put("model_id", providerSetting.modelId)
+                // 显式锁定输出格式为 mp3, 与下面 AudioFormat.MP3 一致。
+                // eleven_v3 等模型默认返回 PCM, 不显式指定会导致拿到 PCM 却按 MP3
+                // 解析, 播放杂音或 PlaybackException。
+                put("output_format", "mp3_44100_128")
                 put("voice_settings", JSONObject().apply {
-                    put("stability", providerSetting.stability)
-                    put("similarity_boost", providerSetting.similarityBoost)
+                    put("stability", stability)
+                    put("similarity_boost", similarityBoost)
                 })
             }
 
@@ -51,7 +59,7 @@ class ElevenLabsTTSProvider : TTSProvider<TTSProviderSetting.ElevenLabs> {
 
             if (!response.isSuccessful) {
                 val errorBody = try {
-                    response.body?.string()
+                    response.body.string()
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to read error body", e)
                     null

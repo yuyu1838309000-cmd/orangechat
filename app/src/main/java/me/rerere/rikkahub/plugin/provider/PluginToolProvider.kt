@@ -149,33 +149,19 @@ class PluginToolProvider(
     fun getPluginPromptInjections(): List<String> {
         // 等待插件初始化完成，避免竞态条件
         runBlocking { pluginManager.awaitInitialization() }
-        
+
         val pluginsWithTools = pluginLoader.getAllLoadedPlugins()
             .filter { it.info.manifest.tools.isNotEmpty() }
 
+        // 只保留"主动性引导"这句话 + 插件名字列表,
+        // 不再逐条重复每个工具的 name/description——完整的工具定义
+        // (含 name/description/参数 schema) 已独立存在于发给模型的 tools 参数里,
+        // 在这里重复列一遍是纯粹的体积浪费。
         val overview = if (pluginsWithTools.isNotEmpty()) {
-            buildString {
-                appendLine("你当前拥有以下插件提供的工具。不要只在用户明确点名某个工具时才使用——只要对话场景与某个工具的用途相关,就应该主动考虑调用它,而不是被动等待用户指示。部分工具绑定的是持续性的人设/系统状态(例如经营、社交、记录类),更需要你自己记得在合适的时机调用,而不是等用户提醒。")
-                appendLine()
-                appendLine("<available_plugins>")
-                pluginsWithTools.forEach { plugin ->
-                    val manifest = plugin.info.manifest
-                    appendLine("  <plugin>")
-                    appendLine("    <name>${manifest.name}</name>")
-                    appendLine("    <description>${manifest.description}</description>")
-                    appendLine("    <tools>")
-                    manifest.tools.forEach { tool ->
-                        appendLine("      <tool>")
-                        appendLine("        <name>${tool.name}</name>")
-                        appendLine("        <description>${tool.description}</description>")
-                        appendLine("      </tool>")
-                    }
-                    appendLine("    </tools>")
-                    appendLine("  </plugin>")
-                }
-                append("</available_plugins>")
-                appendLine()
-            }
+            val pluginNames = pluginsWithTools.joinToString("、") { it.info.manifest.name }
+            "你当前装载了以下插件提供的工具（完整工具列表和参数见 tools 定义）：${pluginNames}。" +
+                "不要只在用户明确点名某个工具时才使用——只要对话场景与某个工具的用途相关，就应该主动考虑调用它，而不是被动等待用户指示。" +
+                "部分工具绑定的是持续性的人设/系统状态（例如经营、社交、记录类），更需要你自己记得在合适的时机调用，而不是等用户提醒。"
         } else {
             null
         }

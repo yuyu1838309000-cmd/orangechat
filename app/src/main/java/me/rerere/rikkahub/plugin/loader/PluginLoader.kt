@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -33,6 +34,22 @@ class PluginLoader(
  
     companion object {
         private const val TAG = "PluginLoader"
+        /**
+         * 单个插件 hook 执行的协程级超时。
+         *
+         * 设为略大于 nativeFetch 的最长超时上限 (15s), 避免协程层先于网络层触发,
+         * 误把"请求还在正常进行"报成"超时"。
+         *
+         * 重要限制 (如实说明): 这层 withTimeoutOrNull 只能让"等待这次 hook 调用结果"
+         * 提前放弃, 无法真正打断 QuickJS 引擎内部正在执行的同步 JS 代码 (比如
+         * nativeFetch 内部还在跑的 OkHttp 请求)。因为 callEvent 全程跑在单线程
+         * pluginDispatcher 上, 即使外层已放弃等待, 这个单线程仍会被卡住的那次调用
+         * 占用, 直到底层请求真正结束 (最长 15s)。期间排在后面的其它 hook 调用、
+         * 以及 callTool (也走这个 dispatcher) 都要继续排队。这是 QuickJS 单线程
+         * 模型的本质限制, 核心阻塞问题已由 ChatService 改为 fire-and-forget 解决,
+         * 这一层只是给"事件处理"一个明确失败信号和日志, 不是彻底防死锁。
+         */
+        private const val HOOK_TIMEOUT_MS = 16_500L
     }
  
     // 单线程调度器，确保所有 QuickJS 操作在同一线程执行
@@ -141,6 +158,10 @@ class PluginLoader(
  
     /**
      * 触发插件事件
+     *
+     * 对订阅了该事件的每个插件 hook, 在单线程 pluginDispatcher 上串行执行。
+     * 每次调用包一层 [HOOK_TIMEOUT_MS] 超时, 超时后记录警告并跳过, 继续处理
+     * 同批次其它插件的 hook, 不让单个插件拖累整批。
      */
     suspend fun callEvent(event: String, params: JsonElement) {
         withContext(pluginDispatcher) {
@@ -149,11 +170,21 @@ class PluginLoader(
                 val matchingHooks = plugin.info.manifest.hooks.filter { it.event == event }
                 for (hook in matchingHooks) {
                     try {
-                        if (plugin.sandbox.hasFunction(hook.handler)) {
-                            plugin.sandbox.callFunction(hook.handler, params)
-                            Log.d(TAG, "Event '$event' handled by plugin ${plugin.id}.${hook.handler}")
-                        } else {
+                        if (!plugin.sandbox.hasFunction(hook.handler)) {
                             Log.w(TAG, "Hook handler '${hook.handler}' not found in plugin ${plugin.id}")
+                            continue
+                        }
+                        val completed = withTimeoutOrNull(HOOK_TIMEOUT_MS) {
+                            plugin.sandbox.callFunction(hook.handler, params)
+                        }
+                        if (completed == null) {
+                            Log.w(
+                                TAG,
+                                "Plugin hook timed out after ${HOOK_TIMEOUT_MS}ms: " +
+                                    "plugin=${plugin.id}, handler='${hook.handler}', event='$event'"
+                            )
+                        } else {
+                            Log.d(TAG, "Event '$event' handled by plugin ${plugin.id}.${hook.handler}")
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to handle event='$event' in plugin=${plugin.id}.${hook.handler}", e)

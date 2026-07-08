@@ -368,7 +368,14 @@ class ChatService(
                 }
 
                 // 触发 message_sent 事件钩子
-                try {
+                // 关键: 这里用 appScope.launch 提交独立协程, 而不是直接 await callEvent。
+                // 原因: callEvent 内部对订阅插件的 handler 在单线程 pluginDispatcher 上串行执行,
+                // supabase_memory 等插件会同步 fetch 网络请求 (最长 15s 超时)。若直接 await,
+                // 用户点发送后会卡在这里直到所有插件 handler 跑完才继续走 sendMessage 后续逻辑。
+                // 改为 fire-and-forget 提交到 AppScope (SupervisorJob) 上, 不挂在当前 sendMessage
+                // 的 job 下 —— 这样用户连续发消息触发 session.getJob()?.cancel() 取消上一条消息 job 时,
+                // 不会把这次插件同步也连累取消掉 (Supabase 记录保持完整)。
+                runCatching {
                     val eventData = JsonObject(
                         mapOf(
                             "assistant_id" to JsonPrimitive(assistant.id.toString()),
@@ -380,8 +387,14 @@ class ChatService(
                             "timestamp" to JsonPrimitive(System.currentTimeMillis())
                         )
                     )
-                    pluginLoader.callEvent("message_sent", eventData)
-                } catch (e: Exception) {
+                    appScope.launch {
+                        try {
+                            pluginLoader.callEvent("message_sent", eventData)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to trigger message_sent event", e)
+                        }
+                    }
+                }.onFailure { e ->
                     Log.w(TAG, "Failed to trigger message_sent event", e)
                 }
 
@@ -881,7 +894,9 @@ addAll(localTools.getTools(assistant.localTools, conversationId.toString()))
             }
 
             // 触发 message_received 事件钩子
-            try {
+            // 同 message_sent: 用 appScope.launch 提交独立协程, 不阻塞 handleMessageComplete
+            // 后续的标题生成/建议生成等流程, 也不随上一条消息的 job 取消而中断。
+            runCatching {
                 val lastAssistantMessage = finalConversation.currentMessages.lastOrNull { it.role == MessageRole.ASSISTANT }
                 val eventData = JsonObject(
                     mapOf(
@@ -892,8 +907,14 @@ addAll(localTools.getTools(assistant.localTools, conversationId.toString()))
                         "timestamp" to JsonPrimitive(System.currentTimeMillis())
                     )
                 )
-                pluginLoader.callEvent("message_received", eventData)
-            } catch (e: Exception) {
+                appScope.launch {
+                    try {
+                        pluginLoader.callEvent("message_received", eventData)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to trigger message_received event", e)
+                    }
+                }
+            }.onFailure { e ->
                 Log.w(TAG, "Failed to trigger message_received event", e)
             }
 
