@@ -71,6 +71,7 @@ import me.rerere.hugeicons.stroke.InLove
 import me.rerere.hugeicons.stroke.LanguageCircle
 import me.rerere.hugeicons.stroke.LookTop
 import me.rerere.hugeicons.stroke.PencilEdit01
+import me.rerere.hugeicons.stroke.Rocket01
 import me.rerere.hugeicons.stroke.Search01
 import me.rerere.hugeicons.stroke.Settings03
 import me.rerere.hugeicons.stroke.Sparkles
@@ -401,6 +402,14 @@ fun ChatDrawerContent(
                             onClick = {
                                 showMenuPopup = false
                                 navController.navigate(Screen.Health)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Mini Apps") },
+                            leadingIcon = { Icon(HugeIcons.Rocket01, null) },
+                            onClick = {
+                                showMenuPopup = false
+                                navController.navigate(Screen.MiniAppManager)
                             }
                         )
                     }

@@ -109,6 +109,9 @@ import me.rerere.rikkahub.ui.pages.health.HealthPage
 import me.rerere.rikkahub.ui.pages.history.HistoryPage
 import me.rerere.rikkahub.ui.pages.imggen.ImageGenPage
 import me.rerere.rikkahub.ui.pages.log.LogPage
+import me.rerere.rikkahub.ui.pages.miniapp.MiniAppEditPage
+import me.rerere.rikkahub.ui.pages.miniapp.MiniAppManagerPage
+import me.rerere.rikkahub.ui.pages.miniapp.MiniAppPage
 import me.rerere.rikkahub.ui.pages.search.SearchPage
 import me.rerere.rikkahub.ui.pages.setting.SettingAboutPage
 import me.rerere.rikkahub.ui.pages.setting.SettingDisplayPage
@@ -715,6 +718,21 @@ class RouteActivity : ComponentActivity() {
                                 )
                             }
 
+                            entry<Screen.MiniAppManager> {
+                                MiniAppManagerPage()
+                            }
+
+                            entry<Screen.MiniAppEdit> { key ->
+                                MiniAppEditPage(id = key.id)
+                            }
+
+                            entry<Screen.MiniApp> { key ->
+                                MiniAppPage(
+                                    url = key.url,
+                                    title = key.title,
+                                )
+                            }
+
                         }
                     )
                     AnimatedVisibility(
@@ -936,4 +954,13 @@ sealed interface Screen : NavKey {
      */
     @Serializable
     data class IncomingCall(val conversationId: String) : Screen
+
+    @Serializable
+    data object MiniAppManager : Screen
+
+    @Serializable
+    data class MiniAppEdit(val id: String?) : Screen
+
+    @Serializable
+    data class MiniApp(val url: String, val title: String?) : Screen
 }

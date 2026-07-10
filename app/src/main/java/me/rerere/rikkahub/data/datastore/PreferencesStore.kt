@@ -38,6 +38,7 @@ import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.data.model.ExternalMemory
 import me.rerere.rikkahub.data.model.InjectionPosition
 import me.rerere.rikkahub.data.model.Lorebook
+import me.rerere.rikkahub.data.model.MiniApp
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
 import me.rerere.rikkahub.data.model.Tag
@@ -162,8 +163,11 @@ class SettingsStore(
         val GATEWAY_POLL_URL = stringPreferencesKey("gateway_poll_url")
         val GATEWAY_POLL_API_SECRET = stringPreferencesKey("gateway_poll_api_secret")
 
-        // 外置记忆库
+        // 外部记忆库
         val EXTERNAL_MEMORIES = stringPreferencesKey("external_memories")
+
+        // Mini App
+        val MINI_APPS = stringPreferencesKey("mini_apps")
     }
 
     private val dataStore = context.settingsStore
@@ -266,6 +270,9 @@ class SettingsStore(
                 externalMemories = preferences[EXTERNAL_MEMORIES]?.let {
                     JsonInstant.decodeFromString(it)
                 } ?: emptyList(),
+                miniApps = preferences[MINI_APPS]?.let {
+                    JsonInstant.decodeFromString(it)
+                } ?: emptyList(),
             )
         }
         .map {
@@ -357,6 +364,7 @@ class SettingsStore(
                 modeInjections = settings.modeInjections.distinctBy { it.id },
                 lorebooks = settings.lorebooks.distinctBy { it.id },
                 quickMessages = settings.quickMessages.distinctBy { it.id },
+                miniApps = settings.miniApps.distinctBy { it.id },
             )
         }
         .onEach {
@@ -434,6 +442,7 @@ class SettingsStore(
             preferences[GATEWAY_POLL_URL] = settings.gatewayPollUrl
             preferences[GATEWAY_POLL_API_SECRET] = settings.gatewayPollApiSecret
             preferences[EXTERNAL_MEMORIES] = JsonInstant.encodeToString(settings.externalMemories)
+            preferences[MINI_APPS] = JsonInstant.encodeToString(settings.miniApps)
         }
     }
 
@@ -569,6 +578,7 @@ data class Settings(
     val gatewayPollUrl: String = "",
     val gatewayPollApiSecret: String = "",
     val externalMemories: List<ExternalMemory> = emptyList(),
+    val miniApps: List<MiniApp> = emptyList(),
 ) {
     companion object {
         // 构造一个用于初始化的settings, 但它不能用于保存，防止使用初始值存储
