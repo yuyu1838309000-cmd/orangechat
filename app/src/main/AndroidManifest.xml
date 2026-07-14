@@ -343,6 +343,16 @@
         android:value="weixin bot message polling" />
     </service>
 
+    <!-- QQ Bot (API v2): WebSocket 网关收 QQ 私聊消息, 转给当前助手处理, 回复发回 QQ -->
+    <service
+      android:name=".service.QqBotService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="qq bot websocket message polling" />
+    </service>
+
     <!-- Voice Call Background Service -->
     <service
       android:name=".service.VoiceCallService"

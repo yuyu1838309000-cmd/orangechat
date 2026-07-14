@@ -72,6 +72,9 @@ val appModule = module {
     // 微信 Bot (iLink 协议) HTTP 客户端
     single { me.rerere.rikkahub.data.weixin.WeixinBotClient(get()) }
 
+    // QQ Bot (API v2) HTTP 客户端 + WebSocket 共用同一个 OkHttpClient
+    single { me.rerere.rikkahub.data.qq.QqBotClient(get()) }
+
     single {
         me.rerere.rikkahub.data.ai.tools.ToolSurfaceBuilder(
             context = get(),
