@@ -102,7 +102,7 @@ private fun DonateMethodsCardGroup() {
         title = { Text(stringResource(R.string.donate_page_donation_methods)) },
     ) {
         item(
-            onClick = { context.openUrl("https://ko-fi.com/reovodev") },
+            onClick = { context.openUrl("https://github.com/sue1231513/orangechat") },
             leadingContent = {
                 AsyncImage(
                     model = R.drawable.kofi,
@@ -111,10 +111,10 @@ private fun DonateMethodsCardGroup() {
                 )
             },
             supportingContent = { Text(stringResource(R.string.donate_page_kofi_desc)) },
-            headlineContent = { Text("Kofi") },
+            headlineContent = { Text("GitHub") },
         )
         item(
-            onClick = { context.openUrl("https://afdian.com/a/reovo") },
+            onClick = { context.openUrl("https://github.com/sue1231513/orangechat") },
             leadingContent = {
                 Icon(
                     painter = painterResource(R.drawable.afdian),
@@ -122,7 +122,7 @@ private fun DonateMethodsCardGroup() {
                 )
             },
             supportingContent = { Text(stringResource(R.string.donate_page_afdian_desc)) },
-            headlineContent = { Text("爱发电") },
+            headlineContent = { Text("项目主页") },
         )
     }
 }

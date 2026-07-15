@@ -61,6 +61,7 @@ const val POMODORO_NOTIFICATION_CHANNEL_ID = "pomodoro_timer"
 const val MUSIC_PLAYER_NOTIFICATION_CHANNEL_ID = "music_player"
 const val DEVICE_EVENT_NOTIFICATION_CHANNEL_ID = "device_event_tracking"
 const val VOICE_CALL_NOTIFICATION_CHANNEL_ID = "voice_call"
+const val ANNOUNCEMENT_NOTIFICATION_CHANNEL_ID = "announcement"
 
 class RikkaHubApp : Application() {
     companion object {
@@ -78,6 +79,20 @@ class RikkaHubApp : Application() {
             modules(appModule, viewModelModule, dataSourceModule, repositoryModule, pluginModule)
         }
         this.createNotificationChannel()
+
+        // 订阅公告推送主题
+        try {
+            com.google.firebase.messaging.FirebaseMessaging
+                .getInstance()
+                .subscribeToTopic("announcement")
+                .addOnCompleteListener { task ->
+                    if (!task.isSuccessful) {
+                        android.util.Log.w("AnnouncementFCM", "订阅失败", task.exception)
+                    }
+                }
+        } catch (e: Exception) {
+            android.util.Log.w("AnnouncementFCM", "FCM 异常", e)
+        }
 
         // 预热 ChatService 单例: 强制在主线程(Application.onCreate 由 Android 保证
         // 在主线程执行, 且先于同一进程内任何 Service/BroadcastReceiver/Activity 回调)
@@ -350,6 +365,13 @@ class RikkaHubApp : Application() {
             .setShowBadge(false)
             .build()
         notificationManager.createNotificationChannel(voiceCallChannel)
+
+        val announcementChannel = NotificationChannelCompat
+            .Builder(ANNOUNCEMENT_NOTIFICATION_CHANNEL_ID, NotificationManagerCompat.IMPORTANCE_HIGH)
+            .setName("公告")
+            .setVibrationEnabled(true)
+            .build()
+        notificationManager.createNotificationChannel(announcementChannel)
     }
 
     override fun onTerminate() {

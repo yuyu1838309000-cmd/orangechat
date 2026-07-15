@@ -1,4 +1,4 @@
-import com.android.build.api.dsl.Packaging
+﻿import com.android.build.api.dsl.Packaging
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.io.FileInputStream
@@ -193,6 +193,7 @@ dependencies {
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.config)
+    implementation(libs.firebase.messaging)
 
     // DataStore
     implementation(libs.androidx.datastore.preferences)
