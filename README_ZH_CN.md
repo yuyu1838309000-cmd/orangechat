@@ -99,18 +99,8 @@
 
 | 渠道 | 链接 |
 |------|------|
-| 官网 | [rikka-ai.com/download](https://rikka-ai.com/download) |
-| Google Play | [Play Store](https://play.google.com/store/apps/details?id=me.rerere.rikkahub) |
-
----
-
-## 💖 赞助商
-
-<div align="center">
-  <img src="app/src/main/assets/icons/aihubmix-color.svg" alt="Aihubmix" width="50" />
-  <p><strong>Aihubmix</strong></p>
-  <p>感谢 <a href="https://aihubmix.com?aff=pG7r">aihubmix.com</a> 的资金支持。一站式全球主流模型服务平台（OpenAI、Claude、Gemini、DeepSeek、Qwen 等数百种模型）。</p>
-</div>
+| GitHub Releases | [sue1231513/orangechat/releases](https://github.com/sue1231513/orangechat/releases) |
+| 源码 | [github.com/sue1231513/orangechat](https://github.com/sue1231513/orangechat) |
 
 ---
 
@@ -188,20 +178,11 @@
 
 ---
 
-## 💰 支持项目
-
-如果橘瓣对你有帮助，欢迎支持开发者：
-
-- [Patreon](https://patreon.com/rikkahub)
-- [爱发电](https://afdian.com/a/reovo)
-
----
-
 ## ⭐ Star History
 
 喜欢这个项目？给个 Star ⭐
 
-[![Star History Chart](https://api.star-history.com/svg?repos=re-ovo/rikkahub&type=Date)](https://star-history.com/#re-ovo/rikkahub&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=sue1231513/orangechat&type=Date)](https://star-history.com/#sue1231513/orangechat&Date)
 
 ---
 
