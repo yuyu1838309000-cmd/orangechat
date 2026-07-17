@@ -232,8 +232,8 @@ class WorkflowEngine(
             ),
         )
 
-        // Headless 敏感工具拦截：若设置开启，禁止后台触发的工作流执行需要用户确认的工具
-        if (settings.workflowHeadlessBlockSensitive) {
+        // Headless 敏感工具拦截：若设置开启且未开启全局自动批准，禁止后台触发的工作流执行需要用户确认的工具
+        if (settings.workflowHeadlessBlockSensitive && !settings.autoApproveAllTools) {
             val blocked = def.actions.filter { action ->
                 tools.find { it.name == action.tool }?.needsApproval == true
             }

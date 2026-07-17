@@ -210,9 +210,22 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         supportingContent = { Text("开启后，每次 AI 调用任何工具前都需要你手动确认") },
                         trailingContent = {
                             Switch(
-                                checked = settings.forceConfirmToolCalls,
+                                checked = settings.forceConfirmToolCalls && !settings.autoApproveAllTools,
                                 onCheckedChange = { enabled ->
-                                    vm.updateSettings(settings.copy(forceConfirmToolCalls = enabled))
+                                    vm.updateSettings(settings.copy(forceConfirmToolCalls = enabled, autoApproveAllTools = false))
+                                }
+                            )
+                        }
+                    )
+                    item(
+                        leadingContent = { Icon(HugeIcons.Alert01, null) },
+                        headlineContent = { Text("自动批准所有工具调用") },
+                        supportingContent = { Text("懒人模式：AI 调用任何工具时自动允许，不再弹窗确认（⚠️ 降低安全性）") },
+                        trailingContent = {
+                            Switch(
+                                checked = settings.autoApproveAllTools,
+                                onCheckedChange = { enabled ->
+                                    vm.updateSettings(settings.copy(autoApproveAllTools = enabled, forceConfirmToolCalls = !enabled))
                                 }
                             )
                         }
@@ -223,9 +236,9 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         supportingContent = { Text("开启后，由定时器/地理围栏等后台触发的工作流将禁止执行需要用户确认的工具（如短信、定位、截图等）") },
                         trailingContent = {
                             Switch(
-                                checked = settings.workflowHeadlessBlockSensitive,
+                                checked = settings.workflowHeadlessBlockSensitive && !settings.autoApproveAllTools,
                                 onCheckedChange = { enabled ->
-                                    vm.updateSettings(settings.copy(workflowHeadlessBlockSensitive = enabled))
+                                    vm.updateSettings(settings.copy(workflowHeadlessBlockSensitive = enabled, autoApproveAllTools = false))
                                 }
                             )
                         }

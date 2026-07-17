@@ -215,6 +215,9 @@ class GenerationHandler(
                 val updatedTools = tools.map { tool ->
                     val toolDef = toolsInternal.find { it.name == tool.toolName }
                     when {
+                        // Auto-approve everything (lazy mode) -> skip approval
+                        settings.autoApproveAllTools -> tool
+
                         // Tool needs approval (or global force confirm) and state is Auto -> set to Pending
                         (settings.forceConfirmToolCalls || toolDef?.needsApproval == true) && tool.approvalState is ToolApprovalState.Auto -> {
                             hasPendingApproval = true
@@ -225,7 +228,7 @@ class GenerationHandler(
                             hasPendingApproval = true
                             tool
                         }
- 
+
                         else -> tool
                     }
                 }
