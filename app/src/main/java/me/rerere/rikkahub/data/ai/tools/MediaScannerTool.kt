@@ -24,6 +24,7 @@ import me.rerere.common.android.Logging
 fun createMediaScannerTool(context: Context): Tool = Tool(
     name = "scan_media",
     description = "Notify the media scanner to scan specified file paths so they appear in gallery apps.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {

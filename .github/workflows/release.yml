@@ -42,9 +42,25 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         if: success()
         with:
           name: artifacts
           path: app/build/outputs/apk/release/*.apk
+
+      - name: Create GitHub Release
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.version }}" \
+            --title "Release ${{ steps.version.outputs.version }}" \
+            --generate-notes \
+            app/build/outputs/apk/release/*.apk

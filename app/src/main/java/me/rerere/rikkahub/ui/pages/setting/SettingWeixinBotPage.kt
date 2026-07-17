@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.zxing.BarcodeFormat
@@ -51,12 +52,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.MessageMultiple01
+import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.WechatBotSetting
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.data.weixin.WeixinBotClient
 import me.rerere.rikkahub.service.WeixinBotService
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
+import me.rerere.rikkahub.ui.components.ui.RiskConfirmDialog
 import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.utils.plus
 import org.koin.compose.koinInject
@@ -87,8 +90,22 @@ fun SettingWeixinBotPage(vm: SettingVM = koinViewModel()) {
     var qrContent by remember { mutableStateOf<String?>(null) }
     var loginStatus by remember { mutableStateOf("未登录") }
     var isLoggingIn by remember { mutableStateOf(false) }
+    var showEnableRiskDialog by remember { mutableStateOf(false) }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+    if (showEnableRiskDialog) {
+        RiskConfirmDialog(
+            title = stringResource(R.string.risk_weixin_bot_title),
+            message = stringResource(R.string.risk_weixin_bot_message),
+            onConfirm = {
+                showEnableRiskDialog = false
+                update(botSetting.copy(enabled = true))
+                WeixinBotService.start(context)
+            },
+            onDismiss = { showEnableRiskDialog = false }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -300,9 +317,12 @@ fun SettingWeixinBotPage(vm: SettingVM = koinViewModel()) {
                             Switch(
                                 checked = botSetting.enabled,
                                 onCheckedChange = { enabled ->
-                                    update(botSetting.copy(enabled = enabled))
-                                    if (enabled) WeixinBotService.start(context)
-                                    else WeixinBotService.stop(context)
+                                    if (enabled) {
+                                        showEnableRiskDialog = true
+                                    } else {
+                                        update(botSetting.copy(enabled = false))
+                                        WeixinBotService.stop(context)
+                                    }
                                 }
                             )
                         }

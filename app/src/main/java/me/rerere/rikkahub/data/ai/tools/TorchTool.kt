@@ -21,6 +21,7 @@ import me.rerere.common.android.Logging
 fun createTorchTool(context: Context): Tool = Tool(
     name = "set_torch",
     description = "Turn the device flashlight/torch on or off.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {

@@ -59,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,8 +71,10 @@ import me.rerere.hugeicons.stroke.Delete02
 import me.rerere.hugeicons.stroke.Folder01
 import me.rerere.hugeicons.stroke.PlusSign
 import me.rerere.hugeicons.stroke.Reload
+import me.rerere.rikkahub.R
 import me.rerere.rikkahub.plugin.model.PluginFolder
 import me.rerere.rikkahub.plugin.model.PluginInfo
+import me.rerere.rikkahub.ui.components.ui.RiskConfirmDialog
 import org.koin.androidx.compose.koinViewModel
 
 private const val TAG = "PluginManagePage"
@@ -93,6 +96,7 @@ fun PluginManagePage(
     val isLoading by viewModel.isLoading.collectAsState()
     val importState by viewModel.importState.collectAsState()
     val operationState by viewModel.operationState.collectAsState()
+    val pendingImport by viewModel.pendingImport.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     val hasStoragePermission = remember { mutableStateOf(checkStoragePermission()) }
@@ -115,7 +119,7 @@ fun PluginManagePage(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let { viewModel.importPlugin(it) }
+        uri?.let { viewModel.previewPlugin(it) }
     }
 
     LaunchedEffect(importState) {
@@ -156,6 +160,58 @@ fun PluginManagePage(
         if (hasStoragePermission.value) {
             viewModel.refreshPlugins()
         }
+    }
+
+    pendingImport?.let { pending ->
+        val manifest = pending.manifest
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelImportPreview() },
+            title = { Text("确认安装插件") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("插件名称: ${manifest.name}")
+                    Text("版本: ${manifest.version}")
+                    Text("作者: ${manifest.author}")
+                    if (manifest.description.isNotBlank()) {
+                        Text("描述: ${manifest.description}")
+                    }
+                    if (manifest.tools.isNotEmpty()) {
+                        Text("")
+                        Text("声明的工具:", style = MaterialTheme.typography.labelLarge)
+                        manifest.tools.forEach { tool ->
+                            Text("• ${tool.name}", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    if (manifest.permissions.isNotEmpty()) {
+                        Text("")
+                        Text("申请的权限:", style = MaterialTheme.typography.labelLarge)
+                        manifest.permissions.forEach { perm ->
+                            Text("• $perm", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    if (manifest.allowedHosts.isNotEmpty()) {
+                        Text("")
+                        Text("允许访问的网络域名:", style = MaterialTheme.typography.labelLarge)
+                        manifest.allowedHosts.forEach { host ->
+                            Text("• $host", style = MaterialTheme.typography.bodySmall)
+                        }
+                    } else {
+                        Text("")
+                        Text("• 不允许任何网络访问", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmImport() }) {
+                    Text("确认安装")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelImportPreview() }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -290,6 +346,36 @@ private fun PluginFolderContent(
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.plugin_import_security_warning_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        text = stringResource(R.string.plugin_import_security_warning_message),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Text(
+                        text = stringResource(R.string.plugin_import_security_warning_action),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
         if (folders.isNotEmpty()) {
             item {
                 Text(

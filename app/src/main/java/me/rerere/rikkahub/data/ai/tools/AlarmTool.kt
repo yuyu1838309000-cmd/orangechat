@@ -21,6 +21,7 @@ import me.rerere.ai.ui.UIMessagePart
 fun createAlarmTool(context: Context): Tool = Tool(
     name = "set_alarm",
     description = "Set an alarm on the user's device through the system clock app.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {
@@ -113,6 +114,7 @@ fun createAlarmTool(context: Context): Tool = Tool(
 fun createTimerTool(context: Context): Tool = Tool(
     name = "set_timer",
     description = "Set a countdown timer on the user's device through the system clock app. Useful for reminders like 'remind me in 10 minutes' or 'set a 5-minute timer'.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {

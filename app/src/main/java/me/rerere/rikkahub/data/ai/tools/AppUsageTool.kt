@@ -24,6 +24,7 @@ import java.util.Locale
 fun createAppUsageTool(context: Context): Tool = Tool(
     name = "get_app_usage",
     description = "Get today's app usage statistics. Returns app names, usage time, and last used time.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {

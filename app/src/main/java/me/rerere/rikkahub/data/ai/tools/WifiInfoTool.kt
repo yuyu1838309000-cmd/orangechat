@@ -20,6 +20,7 @@ import me.rerere.common.android.Logging
 fun createWifiInfoTool(context: Context): Tool = Tool(
     name = "get_wifi_info",
     description = "Get current WiFi connection info including SSID, BSSID, IP address, signal strength and link speed. Requires location permission.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {}

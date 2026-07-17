@@ -90,6 +90,7 @@ fun createGetVolumeTool(context: Context): Tool = Tool(
 fun createSetVolumeTool(context: Context): Tool = Tool(
     name = "set_volume",
     description = "Set the volume for a given audio stream by percentage (0-100). Changing ring/notification requires Do Not Disturb access.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {

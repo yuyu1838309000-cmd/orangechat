@@ -22,6 +22,7 @@ import me.rerere.common.android.Logging
 fun createShareTool(context: Context): Tool = Tool(
     name = "share",
     description = "Share text or URL via the system share sheet.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {

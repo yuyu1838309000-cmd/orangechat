@@ -65,6 +65,7 @@ private fun simStateToString(state: Int): String = when (state) {
 fun createTelephonyInfoTool(context: Context): Tool = Tool(
     name = "get_telephony_info",
     description = "Get SIM card info, carrier, and network type. Requires READ_PHONE_STATE permission.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {}

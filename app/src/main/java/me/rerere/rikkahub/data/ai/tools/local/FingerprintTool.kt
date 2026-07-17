@@ -34,6 +34,7 @@ import java.util.UUID
  */
 fun fingerprintTool(context: Context, buffer: BiometricResultBuffer): Tool = Tool(
     name = "verify_fingerprint",
+    needsApproval = true,
     description = """
         Show the system biometric prompt to verify the user's identity using fingerprint,
         face, or other registered biometric. The user must explicitly authenticate.

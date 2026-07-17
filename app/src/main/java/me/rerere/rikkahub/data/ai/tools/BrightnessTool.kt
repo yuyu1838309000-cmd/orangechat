@@ -73,6 +73,7 @@ fun createGetBrightnessTool(context: Context): Tool = Tool(
 fun createSetBrightnessTool(context: Context): Tool = Tool(
     name = "set_brightness",
     description = "Set the screen brightness (1-255). Requires WRITE_SETTINGS special permission. Will disable auto-brightness first.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {

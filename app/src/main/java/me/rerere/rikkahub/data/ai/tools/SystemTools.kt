@@ -85,6 +85,7 @@ class SystemTools(private val context: Context, private val settings: Settings) 
         Tool(
             name = "get_location",
             description = "Get the current device location with coordinates and address. Uses Amap API for reverse geocoding if API key is configured.",
+            needsApproval = true,
             parameters = {
                 InputSchema.Obj(
                     properties = buildJsonObject {
@@ -177,6 +178,7 @@ class SystemTools(private val context: Context, private val settings: Settings) 
         Tool(
             name = "get_notifications",
             description = "Get today's notifications from the device. Returns notification titles, content, app names, and timestamps.",
+            needsApproval = true,
             parameters = {
                 InputSchema.Obj(
                     properties = buildJsonObject {
@@ -226,6 +228,7 @@ class SystemTools(private val context: Context, private val settings: Settings) 
         Tool(
             name = "supabase_query",
             description = "Query data from Supabase tables. Supports two operations: (1) query_recent_messages - get the most recent N rows from a table ordered by created_at descending; (2) search_messages - search rows containing a keyword using case-insensitive matching on the content column.",
+            needsApproval = true,
             parameters = {
                 InputSchema.Obj(
                     properties = buildJsonObject {

@@ -48,6 +48,13 @@ class PluginSandbox(
         ignoreUnknownKeys = true
         isLenient = true
     }
+
+    /**
+     * 插件允许访问的网络域名白名单。
+     * 由宿主在加载插件时根据 manifest.allowedHosts 注入。
+     * 空列表表示禁止所有外部网络请求。
+     */
+    var allowedHosts: List<String> = emptyList()
  
     // QuickJS上下文
     private var quickJSContext: QuickJSContext? = null
@@ -318,6 +325,18 @@ function fetch(url, options) {
     private fun nativeFetch(url: String, optionsJson: String): String {
         Log.d(TAG, "nativeFetch: $url")
         return try {
+            // 域名白名单检查
+            if (allowedHosts.isNotEmpty() && !allowedHosts.contains("*")) {
+                val host = java.net.URL(url).host
+                val isAllowed = allowedHosts.any { allowed ->
+                    host == allowed || host.endsWith(".$allowed")
+                }
+                if (!isAllowed) {
+                    Log.w(TAG, "nativeFetch blocked: host='$host' not in allowedHosts=$allowedHosts")
+                    return """{"success":false,"error":"Network request to '$host' is not allowed. Please add it to manifest.allowedHosts."}"""
+                }
+            }
+
             val options = json.parseToJsonElement(optionsJson) as? JsonObject ?: JsonObject(emptyMap())
             val method = (options["method"] as? JsonPrimitive)?.contentOrNull?.uppercase() ?: "GET"
             val headers = options["headers"] as? JsonObject

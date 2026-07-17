@@ -11,6 +11,7 @@ import me.rerere.hugeicons.stroke.Code
 import me.rerere.hugeicons.stroke.Earth
 import me.rerere.hugeicons.stroke.File02
 import me.rerere.hugeicons.stroke.Github
+import me.rerere.hugeicons.stroke.SecurityCheck
 import me.rerere.hugeicons.stroke.SmartPhone01
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
@@ -148,7 +149,7 @@ fun SettingAboutPage() {
                             ),
                             leadingContent = { Icon(HugeIcons.Code, null) },
                             supportingContent = {
-                                Text("${BuildConfig.VERSION_NAME} / ${BuildConfig.VERSION_CODE}")
+                                Text("${BuildConfig.VERSION_NAME} / ${BuildConfig.VERSION_CODE} / ${BuildConfig.GIT_COMMIT} / ${BuildConfig.BUILD_TIME}")
                             },
                             headlineContent = { Text(stringResource(R.string.about_page_version)) },
                         )
@@ -204,6 +205,65 @@ fun SettingAboutPage() {
                                 Text(stringResource(R.string.about_page_upstream_desc))
                             },
                             headlineContent = { Text(stringResource(R.string.about_page_upstream_name)) },
+                        )
+                    }
+                }
+
+                item {
+                    CardGroup(
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    ) {
+                        item(
+                            onClick = {
+                                navController.navigate(
+                                    Screen.Legal(
+                                        titleRes = R.string.legal_user_agreement_title,
+                                        contentRes = R.string.legal_user_agreement_text
+                                    )
+                                )
+                            },
+                            leadingContent = { Icon(HugeIcons.File02, null) },
+                            supportingContent = { Text(stringResource(R.string.legal_user_agreement_desc)) },
+                            headlineContent = { Text(stringResource(R.string.legal_user_agreement_title)) },
+                        )
+                        item(
+                            onClick = {
+                                navController.navigate(
+                                    Screen.Legal(
+                                        titleRes = R.string.legal_privacy_policy_title,
+                                        contentRes = R.string.legal_privacy_policy_text
+                                    )
+                                )
+                            },
+                            leadingContent = { Icon(HugeIcons.File02, null) },
+                            supportingContent = { Text(stringResource(R.string.legal_privacy_policy_desc)) },
+                            headlineContent = { Text(stringResource(R.string.legal_privacy_policy_title)) },
+                        )
+                        item(
+                            onClick = {
+                                navController.navigate(
+                                    Screen.Legal(
+                                        titleRes = R.string.legal_disclaimer_title,
+                                        contentRes = R.string.legal_disclaimer_text
+                                    )
+                                )
+                            },
+                            leadingContent = { Icon(HugeIcons.SecurityCheck, null) },
+                            supportingContent = { Text(stringResource(R.string.legal_disclaimer_desc)) },
+                            headlineContent = { Text(stringResource(R.string.legal_disclaimer_title)) },
+                        )
+                        item(
+                            onClick = {
+                                navController.navigate(
+                                    Screen.Legal(
+                                        titleRes = R.string.legal_plugin_security_title,
+                                        contentRes = R.string.legal_plugin_security_text
+                                    )
+                                )
+                            },
+                            leadingContent = { Icon(HugeIcons.SecurityCheck, null) },
+                            supportingContent = { Text(stringResource(R.string.legal_plugin_security_desc)) },
+                            headlineContent = { Text(stringResource(R.string.legal_plugin_security_title)) },
                         )
                     }
                 }

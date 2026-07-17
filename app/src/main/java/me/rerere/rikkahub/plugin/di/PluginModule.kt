@@ -24,7 +24,7 @@ import org.koin.dsl.module
  */
 val pluginModule = module {
     // Scanner
-    single { PluginScanner(androidContext()) }
+    single { PluginScanner(androidContext(), get()) }
 
     // Repository
     single { PluginRepository(androidContext()) }
@@ -33,7 +33,7 @@ val pluginModule = module {
     single { PluginLoader(androidContext(), get<OkHttpClient>(), get<MemoryBankService>(), get<SettingsStore>()) }
 
     // Manager
-    single { PluginManager(androidContext(), get(), get(), get()) }
+    single { PluginManager(androidContext(), get(), get(), get(), get()) }
 
     // Provider - 需要PluginManager来确保插件已初始化
     single { PluginToolProvider(get(), get()) }

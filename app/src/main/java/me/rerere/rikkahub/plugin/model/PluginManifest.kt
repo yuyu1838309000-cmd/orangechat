@@ -109,7 +109,15 @@ data class PluginManifest(
      * key 为事件名，如 "onPageTurn", "onAnnotationAdded"
      * value 为该事件的配置，支持 call_js_function 或 call_ai 两种 action
      */
-    val hookConfigs: Map<String, PluginHookConfig> = emptyMap()
+    val hookConfigs: Map<String, PluginHookConfig> = emptyMap(),
+
+    /**
+     * 插件允许访问的网络域名白名单。
+     * 插件通过 JS fetch() 发起的 HTTP 请求，目标域名必须在此列表中才会被放行。
+     * 空列表表示禁止所有网络请求（仅允许本地 dataStore 和内存库交互）。
+     * 特殊值 "*" 表示允许所有域名（不推荐，仅用于开发调试）。
+     */
+    val allowedHosts: List<String> = emptyList()
 )
 
 /**

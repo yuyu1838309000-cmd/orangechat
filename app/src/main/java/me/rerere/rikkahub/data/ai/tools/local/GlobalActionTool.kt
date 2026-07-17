@@ -36,6 +36,7 @@ fun globalActionTool(
     streamer: InteractiveToolStreamer = InteractiveToolStreamer.NoOp,
 ): Tool = Tool(
     name = "global_action",
+    needsApproval = true,
     description = """
         Perform an Android system-level action: back / home / recents / notifications /
         quick_settings / lock_screen / power_dialog. Routed through

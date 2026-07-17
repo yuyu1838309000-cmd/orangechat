@@ -19,6 +19,7 @@ import me.rerere.ai.core.Tool
 import me.rerere.rikkahub.data.ai.tools.HardlineCommandGuard
 import me.rerere.rikkahub.data.ai.tools.LocalTools
 import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.security.SecurityAuditRepository
 import me.rerere.rikkahub.workflow.condition.ConditionEvaluator
 import me.rerere.rikkahub.workflow.condition.ContextProvider
 import me.rerere.rikkahub.workflow.model.WorkflowAction
@@ -63,6 +64,7 @@ class WorkflowEngine(
     private val settingsStore: SettingsStore,
     private val contextProvider: ContextProvider,
     private val actionRunner: WorkflowActionRunner,
+    private val auditRepo: SecurityAuditRepository? = null,
 ) {
 
     /**
@@ -229,6 +231,27 @@ class WorkflowEngine(
                 isHeadless = true,
             ),
         )
+
+        // Headless 敏感工具拦截：若设置开启，禁止后台触发的工作流执行需要用户确认的工具
+        if (settings.workflowHeadlessBlockSensitive) {
+            val blocked = def.actions.filter { action ->
+                tools.find { it.name == action.tool }?.needsApproval == true
+            }
+            if (blocked.isNotEmpty()) {
+                val names = blocked.joinToString(", ") { it.tool }
+                auditRepo?.log(
+                    category = "workflow",
+                    action = "blocked",
+                    target = workflowId,
+                    detail = "工作流 '${entity.name}' 后台触发时因包含敏感工具 [$names] 被拦截",
+                    status = "blocked",
+                )
+                return persistAndReturn(
+                    workflowId, firedAtMs, started, WorkflowRunStatus.FAILED,
+                    "headless_sensitive_blocked: $names", "", ledgerId,
+                )
+            }
+        }
 
         // Execute the action sequence. ActionRunner enforces per-action timeout + HARDLINE.
         val result = actionRunner.run(def.actions, tools)

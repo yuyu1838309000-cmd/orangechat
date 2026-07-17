@@ -62,6 +62,7 @@ import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.service.WebServerService
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
+import me.rerere.rikkahub.ui.components.ui.RiskConfirmDialog
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionLocalNetwork
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionManager
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionNotification
@@ -108,6 +109,8 @@ fun SettingWebPage() {
     PermissionManager(permissionState = permissionState)
 
     var pendingStart by remember { mutableStateOf(false) }
+    var showStartRiskDialog by remember { mutableStateOf(false) }
+    var showPublicRiskDialog by remember { mutableStateOf(false) }
 
     fun startWebServer() {
         val intent = Intent(context, WebServerService::class.java).apply {
@@ -124,8 +127,36 @@ fun SettingWebPage() {
     LaunchedEffect(permissionState.allPermissionsGranted) {
         if (pendingStart && permissionState.allPermissionsGranted) {
             pendingStart = false
-            startWebServer()
+            showStartRiskDialog = true
         }
+    }
+
+    if (showStartRiskDialog) {
+        RiskConfirmDialog(
+            title = stringResource(R.string.risk_web_server_title),
+            message = stringResource(R.string.risk_web_server_message),
+            onConfirm = {
+                showStartRiskDialog = false
+                if (!settings.webServerLocalhostOnly) {
+                    showPublicRiskDialog = true
+                } else {
+                    startWebServer()
+                }
+            },
+            onDismiss = { showStartRiskDialog = false }
+        )
+    }
+
+    if (showPublicRiskDialog) {
+        RiskConfirmDialog(
+            title = stringResource(R.string.risk_web_server_public_title),
+            message = stringResource(R.string.risk_web_server_public_message),
+            onConfirm = {
+                showPublicRiskDialog = false
+                startWebServer()
+            },
+            onDismiss = { showPublicRiskDialog = false }
+        )
     }
 
     fun copyUrl(url: String) {
@@ -148,7 +179,7 @@ fun SettingWebPage() {
                     if (serverState.isLoading) return@ExtendedFloatingActionButton
                     if (!serverState.isRunning) {
                         if (permissionState.allPermissionsGranted) {
-                            startWebServer()
+                            showStartRiskDialog = true
                         } else {
                             pendingStart = true
                             permissionState.requestPermissions()
@@ -315,6 +346,16 @@ fun SettingWebPage() {
                             )
                         },
                     )
+                    if (!settings.webServerJwtEnabled || settings.webServerAccessPassword.isBlank()) {
+                        item(
+                            headlineContent = {
+                                Text(
+                                    text = stringResource(R.string.web_server_security_warning_no_jwt),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                        )
+                    }
                     if (serverState.isRunning) {
                         val port = serverState.port
                         if (!serverState.localhostOnly) {

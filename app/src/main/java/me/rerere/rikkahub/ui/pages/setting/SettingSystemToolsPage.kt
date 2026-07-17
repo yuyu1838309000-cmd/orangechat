@@ -71,6 +71,8 @@ import me.rerere.rikkahub.data.datastore.SystemToolsSetting
 import me.rerere.rikkahub.data.gadgetbridge.GadgetbridgeReader
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
+import me.rerere.rikkahub.ui.components.ui.RiskConfirmDialog
+import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionAccessBackgroundLocation
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionAccessCoarseLocation
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionAccessFineLocation
@@ -83,11 +85,13 @@ import me.rerere.rikkahub.ui.components.ui.permission.PermissionReadPhoneState
 import me.rerere.rikkahub.ui.components.ui.permission.rememberPermissionState
 import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.utils.plus
+import me.rerere.rikkahub.Screen
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun SettingSystemToolsPage(vm: SettingVM = koinViewModel()) {
     val context = LocalContext.current
+    val navController = LocalNavController.current
     val settings by vm.settings.collectAsStateWithLifecycle()
     var systemToolsSetting by remember(settings) {
         mutableStateOf(settings.systemToolsSetting)
@@ -166,6 +170,37 @@ fun SettingSystemToolsPage(vm: SettingVM = koinViewModel()) {
                     leadingIcon = { Icon(imageVector = HugeIcons.Search01, contentDescription = null) },
                     singleLine = true,
                 )
+            }
+
+            // 安全提示
+            item {
+                CardGroup(
+                    title = { Text(stringResource(R.string.system_tools_security_warning_title)) },
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
+                    item(
+                        headlineContent = {
+                            Text(
+                                text = stringResource(R.string.system_tools_security_warning_message),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                text = stringResource(R.string.system_tools_security_warning_action),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        onClick = {
+                            navController.navigate(
+                                Screen.Legal(
+                                    titleRes = R.string.system_tools_security_warning_title,
+                                    contentRes = R.string.system_tools_security_warning_message
+                                )
+                            )
+                        }
+                    )
+                }
             }
 
             // 后台保活

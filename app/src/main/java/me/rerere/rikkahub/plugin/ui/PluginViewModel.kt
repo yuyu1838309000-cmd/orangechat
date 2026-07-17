@@ -16,6 +16,8 @@ import kotlinx.serialization.json.JsonElement
 import me.rerere.rikkahub.plugin.manager.PluginManager
 import me.rerere.rikkahub.plugin.model.PluginFolder
 import me.rerere.rikkahub.plugin.model.PluginInfo
+import me.rerere.rikkahub.plugin.model.PluginManifest
+import java.io.File
 
 /**
  * 插件ViewModel
@@ -36,9 +38,18 @@ class PluginViewModel(
     private val _importState = MutableStateFlow<ImportState>(ImportState.Idle)
     val importState: StateFlow<ImportState> = _importState.asStateFlow()
 
+    // 预览导入状态（用于权限确认对话框）
+    private val _pendingImport = MutableStateFlow<PendingImport?>(null)
+    val pendingImport: StateFlow<PendingImport?> = _pendingImport.asStateFlow()
+
     // 操作状态
     private val _operationState = MutableStateFlow<OperationState>(OperationState.Idle)
     val operationState: StateFlow<OperationState> = _operationState.asStateFlow()
+
+    data class PendingImport(
+        val manifest: PluginManifest,
+        val tempDir: File
+    )
 
     /**
      * 刷新插件列表
@@ -47,6 +58,59 @@ class PluginViewModel(
         viewModelScope.launch {
             pluginManager.refreshPlugins()
         }
+    }
+
+    /**
+     * 预览插件（解析 manifest，不解压到插件目录）
+     */
+    fun previewPlugin(uri: android.net.Uri) {
+        viewModelScope.launch {
+            _importState.value = ImportState.Loading
+            try {
+                val result = pluginManager.previewPlugin(uri)
+                if (result.isSuccess) {
+                    val pair = result.getOrThrow()
+                    _pendingImport.value = PendingImport(pair.first, pair.second)
+                    _importState.value = ImportState.Idle
+                } else {
+                    _importState.value = ImportState.Error(
+                        result.exceptionOrNull()?.message ?: "解析插件失败"
+                    )
+                }
+            } catch (e: Exception) {
+                _importState.value = ImportState.Error(e.message ?: "Unknown error")
+            }
+        }
+    }
+
+    /**
+     * 确认导入插件（在 previewPlugin 后调用）
+     */
+    fun confirmImport() {
+        viewModelScope.launch {
+            val pending = _pendingImport.value ?: return@launch
+            _importState.value = ImportState.Loading
+            try {
+                val result = pluginManager.confirmImport(pending.manifest, pending.tempDir)
+                _importState.value = if (result.isSuccess) {
+                    ImportState.Success(result.getOrThrow())
+                } else {
+                    ImportState.Error(result.exceptionOrNull()?.message ?: "导入失败")
+                }
+            } catch (e: Exception) {
+                _importState.value = ImportState.Error(e.message ?: "Unknown error")
+            } finally {
+                _pendingImport.value = null
+            }
+        }
+    }
+
+    /**
+     * 取消导入预览
+     */
+    fun cancelImportPreview() {
+        _pendingImport.value?.tempDir?.deleteRecursively()
+        _pendingImport.value = null
     }
 
     /**

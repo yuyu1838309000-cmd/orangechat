@@ -25,6 +25,7 @@ import me.rerere.common.android.Logging
 fun createVibrateTool(context: Context): Tool = Tool(
     name = "vibrate",
     description = "Vibrate the device. Provide either duration_ms (single vibration) or pattern (waveform of off/on milliseconds).",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {

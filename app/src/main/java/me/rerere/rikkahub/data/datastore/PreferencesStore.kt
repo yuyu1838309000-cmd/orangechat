@@ -27,7 +27,11 @@ import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.ProviderSetting
+import me.rerere.asr.ASRProviderSetting
 import me.rerere.rikkahub.AppScope
+import me.rerere.rikkahub.data.datastore.migration.PreferenceStoreV1Migration
+import me.rerere.rikkahub.data.datastore.migration.PreferenceStoreV2Migration
+import me.rerere.rikkahub.data.datastore.migration.PreferenceStoreV3Migration
 import me.rerere.rikkahub.data.ai.mcp.McpServerConfig
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_COMPRESS_PROMPT
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_OCR_PROMPT
@@ -35,10 +39,6 @@ import me.rerere.rikkahub.data.ai.prompts.DEFAULT_SUGGESTION_PROMPT
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_TITLE_PROMPT
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_TRANSLATION_PROMPT
 import me.rerere.rikkahub.data.ai.prompts.LEARNING_MODE_PROMPT
-import me.rerere.asr.ASRProviderSetting
-import me.rerere.rikkahub.data.datastore.migration.PreferenceStoreV1Migration
-import me.rerere.rikkahub.data.datastore.migration.PreferenceStoreV2Migration
-import me.rerere.rikkahub.data.datastore.migration.PreferenceStoreV3Migration
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.data.model.ExternalMemory
@@ -49,7 +49,6 @@ import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
 import me.rerere.rikkahub.data.model.Tag
 import me.rerere.rikkahub.data.sync.s3.S3Config
-import me.rerere.rikkahub.data.datastore.SystemToolsSetting
 import me.rerere.rikkahub.ui.theme.CustomTheme
 import me.rerere.rikkahub.ui.theme.PresetThemes
 import me.rerere.rikkahub.utils.JsonInstant
@@ -88,6 +87,10 @@ class SettingsStore(
         val CUSTOM_THEMES = stringPreferencesKey("custom_themes")
         val DISPLAY_SETTING = stringPreferencesKey("display_setting")
         val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
+
+        // 免责声明与用户协议
+        val DISCLAIMER_ACCEPTED = booleanPreferencesKey("disclaimer_accepted")
+        val DISCLAIMER_ACCEPTED_AT = intPreferencesKey("disclaimer_accepted_at")
 
         // 模型选择
         val ENABLE_WEB_SEARCH = booleanPreferencesKey("enable_web_search")
@@ -177,6 +180,12 @@ class SettingsStore(
 
         // Mini App
         val MINI_APPS = stringPreferencesKey("mini_apps")
+
+        // 强制确认所有工具调用
+        val FORCE_CONFIRM_TOOL_CALLS = booleanPreferencesKey("force_confirm_tool_calls")
+
+        // 后台触发工作流时拦截敏感工具（needsApproval=true）
+        val WORKFLOW_HEADLESS_BLOCK_SENSITIVE = booleanPreferencesKey("workflow_headless_block_sensitive")
     }
 
     private val dataStore = context.settingsStore
@@ -194,6 +203,8 @@ class SettingsStore(
             }
         }.map { preferences ->
             Settings(
+                disclaimerAccepted = preferences[DISCLAIMER_ACCEPTED] == true,
+                disclaimerAcceptedAt = preferences[DISCLAIMER_ACCEPTED_AT] ?: 0,
                 enableWebSearch = preferences[ENABLE_WEB_SEARCH] == true,
                 favoriteModels = preferences[FAVORITE_MODELS]?.let {
                     JsonInstant.decodeFromString(it)
@@ -292,6 +303,8 @@ class SettingsStore(
                 miniApps = preferences[MINI_APPS]?.let {
                     JsonInstant.decodeFromString(it)
                 } ?: emptyList(),
+                forceConfirmToolCalls = preferences[FORCE_CONFIRM_TOOL_CALLS] != false,
+                workflowHeadlessBlockSensitive = preferences[WORKFLOW_HEADLESS_BLOCK_SENSITIVE] != false,
             )
         }
         .map {
@@ -412,6 +425,9 @@ class SettingsStore(
             preferences[DEVELOPER_MODE] = settings.developerMode
             preferences[DISPLAY_SETTING] = JsonInstant.encodeToString(settings.displaySetting)
 
+            preferences[DISCLAIMER_ACCEPTED] = settings.disclaimerAccepted
+            preferences[DISCLAIMER_ACCEPTED_AT] = settings.disclaimerAcceptedAt
+
             preferences[ENABLE_WEB_SEARCH] = settings.enableWebSearch
             preferences[FAVORITE_MODELS] = JsonInstant.encodeToString(settings.favoriteModels)
             preferences[SELECT_MODEL] = settings.chatModelId.toString()
@@ -467,6 +483,8 @@ class SettingsStore(
             preferences[KEEP_ALIVE_ENABLED] = settings.keepAliveEnabled
             preferences[EXTERNAL_MEMORIES] = JsonInstant.encodeToString(settings.externalMemories)
             preferences[MINI_APPS] = JsonInstant.encodeToString(settings.miniApps)
+            preferences[FORCE_CONFIRM_TOOL_CALLS] = settings.forceConfirmToolCalls
+            preferences[WORKFLOW_HEADLESS_BLOCK_SENSITIVE] = settings.workflowHeadlessBlockSensitive
         }
     }
 
@@ -550,6 +568,8 @@ class SettingsStore(
 data class Settings(
     @Transient
     val init: Boolean = false,
+    val disclaimerAccepted: Boolean = false,
+    val disclaimerAcceptedAt: Int = 0,
     val dynamicColor: Boolean = true,
     val themeId: String = PresetThemes[0].id,
     val customThemes: List<CustomTheme> = emptyList(),
@@ -602,6 +622,8 @@ data class Settings(
     val keepAliveEnabled: Boolean = false,
     val externalMemories: List<ExternalMemory> = emptyList(),
     val miniApps: List<MiniApp> = emptyList(),
+    val forceConfirmToolCalls: Boolean = true,
+    val workflowHeadlessBlockSensitive: Boolean = true,
 ) {
     companion object {
         // 构造一个用于初始化的settings, 但它不能用于保存，防止使用初始值存储

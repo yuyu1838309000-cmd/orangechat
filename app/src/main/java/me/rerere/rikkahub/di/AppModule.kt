@@ -59,6 +59,7 @@ val appModule = module {
             settingsStore = get(),
             contextProvider = get(),
             actionRunner = get(),
+            auditRepo = get(),
         ).also { engine ->
             get<me.rerere.rikkahub.workflow.repository.WorkflowRepository>().bindEngine(engine)
         }

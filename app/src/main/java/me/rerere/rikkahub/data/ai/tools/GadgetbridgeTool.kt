@@ -21,6 +21,7 @@ import me.rerere.rikkahub.data.gadgetbridge.GadgetbridgeReader
 
 fun createGadgetbridgeTool(customPath: String = ""): Tool = Tool(
     name = "get_gadgetbridge_data",
+    needsApproval = true,
     description = "Get health and fitness data from Gadgetbridge (wearable device companion app). " +
         "Returns step count, heart rate, sleep data, blood oxygen, stress, and calories. " +
         "Reads from Gadgetbridge's auto-exported database. " +

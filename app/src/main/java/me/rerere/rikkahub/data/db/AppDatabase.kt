@@ -32,6 +32,8 @@ import me.rerere.rikkahub.data.db.entity.MessageNodeEntity
 import me.rerere.rikkahub.data.db.entity.SshHostEntity
 import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
 import me.rerere.rikkahub.data.db.dao.SshHostDao
+import me.rerere.rikkahub.data.security.SecurityAuditDao
+import me.rerere.rikkahub.data.security.SecurityAuditEntity
 import me.rerere.rikkahub.workflow.db.WorkflowDao
 import me.rerere.rikkahub.workflow.db.WorkflowEntity
 import me.rerere.rikkahub.workflow.db.WorkflowRunDao
@@ -55,8 +57,9 @@ import me.rerere.rikkahub.utils.JsonInstant
         WorkflowEntity::class,
         WorkflowRunEntity::class,
         SshHostEntity::class,
+        SecurityAuditEntity::class,
     ],
-    version = 28,
+    version = 29,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 2, to = 3),
@@ -74,6 +77,7 @@ import me.rerere.rikkahub.utils.JsonInstant
         AutoMigration(from = 22, to = 23),
         AutoMigration(from = 26, to = 27),
         AutoMigration(from = 27, to = 28),
+        AutoMigration(from = 28, to = 29),
     ]
 )
 @TypeConverters(TokenUsageConverter::class)
@@ -101,6 +105,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun workflowRunDao(): WorkflowRunDao
 
     abstract fun sshHostDao(): SshHostDao
+
+    abstract fun securityAuditDao(): SecurityAuditDao
 }
 
 object TokenUsageConverter {

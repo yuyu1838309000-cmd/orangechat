@@ -53,6 +53,20 @@ android {
         localProperties.getProperty("keyAlias") != null &&
         localProperties.getProperty("keyPassword") != null
 
+    // 构建溯源信息
+    val gitCommit = try {
+        providers.exec {
+            commandLine("git", "rev-parse", "--short", "HEAD")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.get().trim()
+    } catch (_: Exception) { "unknown" }
+    val buildTime = try {
+        providers.exec {
+            commandLine("git", "log", "-1", "--format=%cd", "--date=iso")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.get().trim()
+    } catch (_: Exception) { "unknown" }
+
     signingConfigs {
         create("release") {
             if (hasReleaseSigning) {
@@ -75,9 +89,8 @@ android {
 
     buildTypes {
         release {
-            // 仅在配置了 release keystore 时启用 release 签名，
-            // 否则使用项目内置共享 debug keystore，保证无 keystore 的人也能编译并签名一致。
-            signingConfig = signingConfigs.getByName(if (hasReleaseSigning) "release" else "debug")
+            // Release 签名配置在 tasks 执行阶段强制校验，避免 Gradle 配置阶段就阻断 debug 构建
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -86,6 +99,8 @@ android {
             )
             buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
+            buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
+            buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -94,6 +109,8 @@ android {
             signingConfig = signingConfigs.getByName(if (hasReleaseSigning) "release" else "debug")
             buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
+            buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
+            buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
         }
         create("baseline") {
             initWith(getByName("release"))
@@ -104,6 +121,8 @@ android {
             isMinifyEnabled = false
             isShrinkResources = false
             isProfileable = true
+            buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
+            buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
         }
     }
     compileOptions {
@@ -138,6 +157,23 @@ android {
         compilerOptions.optIn.add("kotlin.time.ExperimentalTime")
         compilerOptions.optIn.add("kotlinx.coroutines.ExperimentalCoroutinesApi")
         compilerOptions.optIn.add("androidx.navigation3.runtime.ExperimentalNavigation3Api")
+    }
+
+    // Release 构建强制要求配置独立的 release keystore，禁止回退到 debug keystore。
+    // 这是为了防止 release APK 使用公开已知的 debug 签名（密码 android）被伪造/篡改。
+    tasks.configureEach {
+        val taskName = name
+        if (taskName.contains("Release", ignoreCase = true) &&
+            (taskName.startsWith("assemble") || taskName.startsWith("bundle") || taskName.startsWith("package"))) {
+            doFirst {
+                if (!hasReleaseSigning) {
+                    throw GradleException(
+                        "Release build requires a release keystore. " +
+                        "Please configure storeFile, storePassword, keyAlias and keyPassword in local.properties."
+                    )
+                }
+            }
+        }
     }
 }
 

@@ -32,6 +32,7 @@ import java.util.Locale
 fun createExploreNearbyTool(context: Context, settings: Settings): Tool = Tool(
     name = "explore_nearby",
     description = "Explore nearby points of interest (POI) around the current location. Requires location permission and Amap API key. Returns restaurants, shops, attractions, etc.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {

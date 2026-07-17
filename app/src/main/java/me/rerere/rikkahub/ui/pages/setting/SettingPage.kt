@@ -29,6 +29,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -202,6 +203,32 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         leadingContent = { Icon(HugeIcons.Package, null) },
                         supportingContent = { Text("管理本地插件，导入ZIP插件包") },
                         headlineContent = { Text("插件管理") },
+                    )
+                    item(
+                        leadingContent = { Icon(HugeIcons.Alert01, null) },
+                        headlineContent = { Text("强制确认工具调用") },
+                        supportingContent = { Text("开启后，每次 AI 调用任何工具前都需要你手动确认") },
+                        trailingContent = {
+                            Switch(
+                                checked = settings.forceConfirmToolCalls,
+                                onCheckedChange = { enabled ->
+                                    vm.updateSettings(settings.copy(forceConfirmToolCalls = enabled))
+                                }
+                            )
+                        }
+                    )
+                    item(
+                        leadingContent = { Icon(HugeIcons.Alert01, null) },
+                        headlineContent = { Text("后台工作流拦截敏感工具") },
+                        supportingContent = { Text("开启后，由定时器/地理围栏等后台触发的工作流将禁止执行需要用户确认的工具（如短信、定位、截图等）") },
+                        trailingContent = {
+                            Switch(
+                                checked = settings.workflowHeadlessBlockSensitive,
+                                onCheckedChange = { enabled ->
+                                    vm.updateSettings(settings.copy(workflowHeadlessBlockSensitive = enabled))
+                                }
+                            )
+                        }
                     )
                     item(
                         onClick = { navController.navigate(Screen.Assistant) },
@@ -388,6 +415,12 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         leadingContent = { Icon(HugeIcons.Bookshelf01, null) },
                         supportingContent = { Text(stringResource(R.string.setting_page_request_logs_desc)) },
                         headlineContent = { Text(stringResource(R.string.setting_page_request_logs)) },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.SecurityAudit) },
+                        leadingContent = { Icon(HugeIcons.Alert01, null) },
+                        supportingContent = { Text("查看插件安装、工作流拦截、敏感操作等安全事件记录") },
+                        headlineContent = { Text("安全审计日志") },
                     )
                     item(
                         onClick = { navController.navigate(Screen.SettingDonate) },

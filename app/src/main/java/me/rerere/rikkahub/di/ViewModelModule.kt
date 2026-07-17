@@ -28,6 +28,7 @@ import me.rerere.rikkahub.ui.pages.extensions.SkillDetailVM
 import me.rerere.rikkahub.ui.pages.extensions.SkillsVM
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceDetailVM
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceVM
+import me.rerere.rikkahub.ui.pages.security.SecurityAuditVM
 import me.rerere.rikkahub.ui.pages.setting.SettingVM
 import me.rerere.rikkahub.ui.pages.share.handler.ShareHandlerVM
 import me.rerere.rikkahub.ui.pages.translator.TranslatorVM
@@ -89,4 +90,5 @@ val viewModelModule = module {
     viewModelOf(::MemoryBankVM)
     viewModelOf(::MiniAppViewModel)
     viewModelOf(::WorkflowsViewModel)
+    viewModelOf(::SecurityAuditVM)
 }

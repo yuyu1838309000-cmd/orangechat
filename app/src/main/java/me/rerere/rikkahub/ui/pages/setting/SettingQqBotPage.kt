@@ -32,16 +32,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Message01
+import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.QqBotSetting
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.service.QqBotService
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
+import me.rerere.rikkahub.ui.components.ui.RiskConfirmDialog
 import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.utils.plus
 import org.koin.androidx.compose.koinViewModel
@@ -64,7 +67,22 @@ fun SettingQqBotPage(vm: SettingVM = koinViewModel()) {
         vm.updateSettings(settings.copy(qqBotSetting = newSetting))
     }
 
+    var showEnableRiskDialog by remember { mutableStateOf(false) }
+
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+    if (showEnableRiskDialog) {
+        RiskConfirmDialog(
+            title = stringResource(R.string.risk_qq_bot_title),
+            message = stringResource(R.string.risk_qq_bot_message),
+            onConfirm = {
+                showEnableRiskDialog = false
+                update(botSetting.copy(enabled = true))
+                QqBotService.start(context)
+            },
+            onDismiss = { showEnableRiskDialog = false }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -162,9 +180,12 @@ fun SettingQqBotPage(vm: SettingVM = koinViewModel()) {
                             Switch(
                                 checked = botSetting.enabled,
                                 onCheckedChange = { enabled ->
-                                    update(botSetting.copy(enabled = enabled))
-                                    if (enabled) QqBotService.start(context)
-                                    else QqBotService.stop(context)
+                                    if (enabled) {
+                                        showEnableRiskDialog = true
+                                    } else {
+                                        update(botSetting.copy(enabled = false))
+                                        QqBotService.stop(context)
+                                    }
                                 }
                             )
                         }

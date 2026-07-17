@@ -24,6 +24,7 @@ import me.rerere.common.android.Logging
 fun createWakeScreenTool(context: Context): Tool = Tool(
     name = "wake_screen",
     description = "Wake up the screen if it is off. Holds a wake lock for a specified duration.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {

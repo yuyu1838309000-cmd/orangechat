@@ -51,6 +51,7 @@ private fun getDefaultCalendarId(context: Context): Long? {
 
 fun createCalendarTool(context: Context): Tool = Tool(
     name = "calendar_tool",
+    needsApproval = true,
     description = "Read and manage calendar events on the device. " +
         "Supports reading events in a time range, creating new events, and deleting events by ID. " +
         "Requires READ_CALENDAR and WRITE_CALENDAR permissions.",

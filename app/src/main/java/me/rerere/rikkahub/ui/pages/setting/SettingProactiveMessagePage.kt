@@ -31,10 +31,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import me.rerere.rikkahub.R
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
+import me.rerere.rikkahub.ui.components.ui.RiskConfirmDialog
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.data.service.ProactiveMessageService
 import me.rerere.rikkahub.data.service.ProactiveMessageWorker
@@ -46,6 +49,44 @@ fun SettingProactiveMessagePage(vm: SettingVM = koinInject()) {
     val navController = LocalNavController.current
     val settings by vm.settings.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
+    var showProactiveRiskDialog by remember { mutableStateOf(false) }
+    var showAggressiveRiskDialog by remember { mutableStateOf(false) }
+
+    if (showProactiveRiskDialog) {
+        RiskConfirmDialog(
+            title = stringResource(R.string.risk_proactive_message_title),
+            message = stringResource(R.string.risk_proactive_message_message),
+            onConfirm = {
+                showProactiveRiskDialog = false
+                val newSetting = settings.proactiveMessageSetting.copy(enabled = true, aggressiveModeEnabled = false)
+                vm.updateSettings(settings.copy(proactiveMessageSetting = newSetting))
+                me.rerere.rikkahub.data.service.DeviceEventAiTriggerService.stop(context)
+                ProactiveMessageService.triggerNow(context, newSetting)
+            },
+            onDismiss = { showProactiveRiskDialog = false }
+        )
+    }
+
+    if (showAggressiveRiskDialog) {
+        RiskConfirmDialog(
+            title = stringResource(R.string.risk_proactive_message_title),
+            message = stringResource(R.string.risk_proactive_message_message),
+            onConfirm = {
+                showAggressiveRiskDialog = false
+                val newSetting = settings.proactiveMessageSetting.copy(aggressiveModeEnabled = true, enabled = false)
+                vm.updateSettings(settings.copy(proactiveMessageSetting = newSetting))
+                ProactiveMessageService.cancel(context)
+                try {
+                    val intent = android.content.Intent(context, me.rerere.rikkahub.data.service.DeviceEventAiTriggerService::class.java)
+                    context.startForegroundService(intent)
+                } catch (e: Exception) {
+                    android.util.Log.e("SettingProactiveMessage", "Failed to start aggressive mode service", e)
+                }
+            },
+            onDismiss = { showAggressiveRiskDialog = false }
+        )
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -71,17 +112,11 @@ fun SettingProactiveMessagePage(vm: SettingVM = koinInject()) {
                             Switch(
                                 checked = settings.proactiveMessageSetting.enabled,
                                 onCheckedChange = { enabled ->
-                                    // 互斥：开启主动消息时关闭激进模式
-                                    val newSetting = if (enabled) {
-                                        settings.proactiveMessageSetting.copy(enabled = true, aggressiveModeEnabled = false)
-                                    } else {
-                                        settings.proactiveMessageSetting.copy(enabled = false)
-                                    }
-                                    vm.updateSettings(settings.copy(proactiveMessageSetting = newSetting))
                                     if (enabled) {
-                                        me.rerere.rikkahub.data.service.DeviceEventAiTriggerService.stop(context)
-                                        ProactiveMessageService.triggerNow(context, newSetting)
+                                        showProactiveRiskDialog = true
                                     } else {
+                                        val newSetting = settings.proactiveMessageSetting.copy(enabled = false)
+                                        vm.updateSettings(settings.copy(proactiveMessageSetting = newSetting))
                                         ProactiveMessageService.cancel(context)
                                     }
                                 }
@@ -226,22 +261,11 @@ fun SettingProactiveMessagePage(vm: SettingVM = koinInject()) {
                             Switch(
                                 checked = settings.proactiveMessageSetting.aggressiveModeEnabled,
                                 onCheckedChange = { enabled ->
-                                    // 互斥：开启激进模式时关闭主动消息
-                                    val newSetting = if (enabled) {
-                                        settings.proactiveMessageSetting.copy(aggressiveModeEnabled = true, enabled = false)
-                                    } else {
-                                        settings.proactiveMessageSetting.copy(aggressiveModeEnabled = false)
-                                    }
-                                    vm.updateSettings(settings.copy(proactiveMessageSetting = newSetting))
                                     if (enabled) {
-                                        ProactiveMessageService.cancel(context)
-                                        try {
-                                            val intent = android.content.Intent(context, me.rerere.rikkahub.data.service.DeviceEventAiTriggerService::class.java)
-                                            context.startForegroundService(intent)
-                                        } catch (e: Exception) {
-                                            android.util.Log.e("SettingProactiveMessage", "Failed to start aggressive mode service", e)
-                                        }
+                                        showAggressiveRiskDialog = true
                                     } else {
+                                        val newSetting = settings.proactiveMessageSetting.copy(aggressiveModeEnabled = false)
+                                        vm.updateSettings(settings.copy(proactiveMessageSetting = newSetting))
                                         me.rerere.rikkahub.data.service.DeviceEventAiTriggerService.stop(context)
                                     }
                                 }

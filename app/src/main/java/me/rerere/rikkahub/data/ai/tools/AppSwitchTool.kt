@@ -31,6 +31,7 @@ private const val TAG = "AppSwitchTool"
  */
 fun createAppSwitchTool(context: Context): Tool = Tool(
     name = "app_switch",
+    needsApproval = true,
     description = "Switch the device screen to another app or bring the chat app to the front. " +
         "Actions: 'launch_app' (launch an app by package name), " +
         "'bring_chat_to_front' (bring this chat app to the foreground), " +

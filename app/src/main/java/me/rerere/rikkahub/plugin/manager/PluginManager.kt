@@ -18,10 +18,12 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import me.rerere.rikkahub.data.security.SecurityAuditRepository
 import me.rerere.rikkahub.data.service.DailySummaryService
 import me.rerere.rikkahub.plugin.loader.PluginLoader
 import me.rerere.rikkahub.plugin.model.PluginFolder
 import me.rerere.rikkahub.plugin.model.PluginInfo
+import me.rerere.rikkahub.plugin.model.PluginManifest
 import me.rerere.rikkahub.plugin.repository.PluginRepository
 import me.rerere.rikkahub.plugin.scanner.PluginScanner
 import java.io.File
@@ -34,7 +36,8 @@ class PluginManager(
     private val context: Context,
     private val scanner: PluginScanner,
     private val loader: PluginLoader,
-    private val repository: PluginRepository
+    private val repository: PluginRepository,
+    private val auditRepo: SecurityAuditRepository? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -86,6 +89,16 @@ class PluginManager(
                 val folderId = assignments[plugin.manifest.id]
                 plugin.copy(config = savedConfig, isEnabled = isEnabled, folderId = folderId)
             }
+            // 审计：记录完整性校验失败的插件
+            pluginsWithConfig.filter { it.loadError?.contains("完整性校验失败") == true }.forEach { plugin ->
+                auditRepo?.log(
+                    category = "plugin",
+                    action = "integrity_failed",
+                    target = plugin.manifest.id,
+                    detail = "插件 ${plugin.manifest.name} (${plugin.manifest.id}) 完整性校验失败，文件可能被篡改",
+                    status = "blocked",
+                )
+            }
             _plugins.value = pluginsWithConfig
             pluginsWithConfig.filter { it.isEnabled }.forEach { plugin ->
                 if (loader.getLoadedPlugin(plugin.manifest.id) == null) {
@@ -120,6 +133,39 @@ class PluginManager(
         )
     }
  
+    /**
+     * 预览插件（不解压到插件目录，仅解析 manifest）
+     */
+    suspend fun previewPlugin(uri: Uri): Result<android.util.Pair<PluginManifest, java.io.File>> {
+        return try {
+            scanner.previewFromZip(uri).map { (manifest, tempDir) ->
+                android.util.Pair(manifest, tempDir)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 确认导入插件（在 previewPlugin 后调用）
+     */
+    suspend fun confirmImport(manifest: PluginManifest, tempDir: java.io.File): Result<PluginInfo> {
+        return try {
+            val result = scanner.completeImport(manifest, tempDir)
+            result.fold(
+                onSuccess = { pluginInfo ->
+                    repository.savePlugin(pluginInfo)
+                    loadPlugin(pluginInfo)
+                    refreshPlugins()
+                    Result.success(pluginInfo)
+                },
+                onFailure = { error -> Result.failure(error) }
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun importPlugin(uri: Uri): Result<PluginInfo> {
         return try {
             val result = scanner.importFromZip(uri)

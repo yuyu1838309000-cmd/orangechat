@@ -10,6 +10,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import kotlinx.serialization.json.Json
+import me.rerere.rikkahub.data.security.SecurityAuditRepository
 import me.rerere.rikkahub.plugin.model.PluginInfo
 import me.rerere.rikkahub.plugin.model.PluginManifest
 import java.io.File
@@ -21,7 +22,8 @@ import java.util.zip.ZipInputStream
  * 负责扫描、导入和管理插件目录
  */
 class PluginScanner(
-    private val context: Context
+    private val context: Context,
+    private val auditRepo: SecurityAuditRepository? = null,
 ) {
     companion object {
         const val PLUGINS_DIR = "Orangechat/plugins"
@@ -71,6 +73,22 @@ class PluginScanner(
         return try {
             val content = manifestFile.readText()
             val manifest = json.decodeFromString(PluginManifest.serializer(), content)
+
+            // 完整性校验：若存在 .integrity 文件则验证，失败则禁用并标记错误
+            val integrityFile = File(pluginDir, ".integrity")
+            if (integrityFile.exists()) {
+                val stored = integrityFile.readText().trim()
+                val current = computePluginChecksum(pluginDir)
+                if (stored != current) {
+                    return PluginInfo(
+                        manifest = manifest,
+                        directory = pluginDir,
+                        isEnabled = false,
+                        loadError = "完整性校验失败：插件文件已被篡改或损坏"
+                    )
+                }
+            }
+
             PluginInfo(
                 manifest = manifest,
                 directory = pluginDir,
@@ -98,7 +116,94 @@ class PluginScanner(
     }
 
     /**
-     * 从ZIP文件导入插件
+     * 从ZIP文件预览插件（不解压到插件目录，仅解析 manifest）
+     * 返回 manifest 和临时目录，供调用方展示权限确认对话框。
+     * 调用方确认后应调用 [completeImport] 完成导入；取消时应清理临时目录。
+     */
+    suspend fun previewFromZip(uri: Uri): Result<Pair<PluginManifest, File>> {
+        return try {
+            val tempFile = File(context.cacheDir, "plugin_preview_${System.currentTimeMillis()}.zip")
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    input.copyTo(output)
+                }
+            } ?: return Result.failure(IllegalStateException("无法读取文件"))
+
+            val tempDir = File(context.cacheDir, "plugin_preview_${System.currentTimeMillis()}")
+            unzip(tempFile, tempDir)
+
+            val manifestFile = findManifest(tempDir)
+                ?: run {
+                    tempFile.delete()
+                    tempDir.deleteRecursively()
+                    return Result.failure(IllegalArgumentException("找不到 manifest.json"))
+                }
+
+            val manifest = json.decodeFromString(PluginManifest.serializer(), manifestFile.readText())
+
+            // 预览阶段保留 tempFile 和 tempDir，供后续 completeImport 使用
+            Result.success(manifest to tempDir)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 完成插件导入（在 previewFromZip 后调用）
+     * @param manifest 预览阶段解析的 manifest
+     * @param tempDir 预览阶段解压的临时目录
+     */
+    suspend fun completeImport(manifest: PluginManifest, tempDir: File): Result<PluginInfo> {
+        return try {
+            val existingPlugins = scanPlugins()
+            if (existingPlugins.any { it.manifest.id == manifest.id }) {
+                tempDir.deleteRecursively()
+                return Result.failure(IllegalArgumentException("插件 ${manifest.id} 已存在"))
+            }
+
+            val manifestFile = findManifest(tempDir)
+                ?: run {
+                    tempDir.deleteRecursively()
+                    return Result.failure(IllegalArgumentException("找不到 manifest.json"))
+                }
+
+            val entryFile = File(manifestFile.parentFile, manifest.entry)
+            if (!entryFile.exists()) {
+                tempDir.deleteRecursively()
+                return Result.failure(IllegalArgumentException("找不到入口文件: ${manifest.entry}"))
+            }
+
+            val pluginDir = File(pluginsDir, manifest.id)
+            if (pluginDir.exists()) {
+                pluginDir.deleteRecursively()
+            }
+            manifestFile.parentFile?.copyRecursively(pluginDir, overwrite = true)
+            tempDir.deleteRecursively()
+
+            // 写入完整性校验和
+            runCatching {
+                val checksum = computePluginChecksum(pluginDir)
+                File(pluginDir, ".integrity").writeText(checksum)
+            }
+
+            loadPluginInfo(pluginDir)?.let {
+                auditRepo?.log(
+                    category = "plugin",
+                    action = "installed",
+                    target = manifest.id,
+                    detail = "插件 ${manifest.name} (${manifest.id}) v${manifest.version} 已安装，作者: ${manifest.author}",
+                    status = "success",
+                )
+                Result.success(it)
+            } ?: Result.failure(IllegalStateException("无法加载插件信息"))
+        } catch (e: Exception) {
+            tempDir.deleteRecursively()
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 从ZIP文件导入插件（旧版一次性导入，保留用于兼容）
      */
     suspend fun importFromZip(uri: Uri): Result<PluginInfo> {
         return try {
@@ -216,5 +321,20 @@ class PluginScanner(
             ?.asSequence()
             ?.map { subdir -> File(subdir, MANIFEST_FILE) }
             ?.firstOrNull { it.exists() }
+    }
+
+    /**
+     * 计算插件目录的 SHA-256 校验和（排除 .integrity 文件本身，稳定排序）
+     */
+    private fun computePluginChecksum(dir: File): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        dir.walkTopDown()
+            .filter { it.isFile && it.name != ".integrity" }
+            .sortedBy { it.relativeTo(dir).path.replace('\\', '/') }
+            .forEach { file ->
+                digest.update(file.relativeTo(dir).path.replace('\\', '/').toByteArray(Charsets.UTF_8))
+                digest.update(file.readBytes())
+            }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }

@@ -65,6 +65,7 @@ class PluginToolProvider(
         return Tool(
             name = ToolNaming.buildPluginToolName(plugin.id, toolDef.name),
             description = buildDescription(plugin, toolDef),
+            needsApproval = true,
             parameters = {
                 InputSchema.Obj(
                     properties = buildParameters(toolDef),

@@ -26,6 +26,7 @@ import java.util.Locale
 
 fun createSmsTool(context: Context): Tool = Tool(
     name = "read_sms",
+    needsApproval = true,
     description = "Read SMS messages from the device inbox. " +
         "Can filter by sender, keyword, and time range. " +
         "Returns sender, content, timestamp, and read status. " +

@@ -74,6 +74,7 @@ private fun resolvePackage(context: Context, packageName: String?, appName: Stri
 
 fun createAppLockTool(context: Context): Tool = Tool(
     name = "app_lock",
+    needsApproval = true,
     description = "Lock or unlock specific apps on the device. When a locked app is opened, the user is " +
         "bounced to the home screen and shown a PIN-entry overlay before they can use it again. " +
         "This is an interception layer built on the accessibility service, NOT an OS-level 'cannot launch' " +

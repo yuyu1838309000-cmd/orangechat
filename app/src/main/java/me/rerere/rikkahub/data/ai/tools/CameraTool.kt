@@ -27,6 +27,7 @@ fun createCameraTool(context: Context): Tool {
     return Tool(
         name = "camera_capture",
         description = "Take a photo with the device camera and return the image for visual analysis. The AI can then describe what it sees, identify objects, scenes, people, text, and more. Use this to understand the visual environment around the user.",
+        needsApproval = true,
         parameters = {
             InputSchema.Obj(
                 properties = buildJsonObject {

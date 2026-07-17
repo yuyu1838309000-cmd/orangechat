@@ -42,6 +42,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
@@ -69,6 +70,7 @@ import coil3.request.crossfade
 import coil3.svg.SvgDecoder
 import com.dokar.sonner.Toaster
 import com.dokar.sonner.rememberToasterState
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import me.rerere.highlight.Highlighter
 import me.rerere.highlight.LocalHighlighter
@@ -112,6 +114,8 @@ import me.rerere.rikkahub.ui.pages.backup.BackupPage
 import me.rerere.rikkahub.ui.pages.chat.ChatPage
 import me.rerere.rikkahub.ui.pages.debug.DebugPage
 import me.rerere.rikkahub.ui.pages.developer.DeveloperPage
+import me.rerere.rikkahub.ui.pages.disclaimer.DisclaimerPage
+import me.rerere.rikkahub.ui.pages.disclaimer.LegalPage
 import me.rerere.rikkahub.ui.pages.extensions.ExtensionsPage
 import me.rerere.rikkahub.ui.pages.extensions.ExternalMemoriesPage
 import me.rerere.rikkahub.ui.pages.extensions.PromptPage
@@ -126,6 +130,7 @@ import me.rerere.rikkahub.ui.pages.health.HealthPage
 import me.rerere.rikkahub.ui.pages.history.HistoryPage
 import me.rerere.rikkahub.ui.pages.imggen.ImageGenPage
 import me.rerere.rikkahub.ui.pages.log.LogPage
+import me.rerere.rikkahub.ui.pages.security.SecurityAuditPage
 import me.rerere.rikkahub.ui.pages.miniapp.MiniAppEditPage
 import me.rerere.rikkahub.ui.pages.miniapp.MiniAppManagerPage
 import me.rerere.rikkahub.ui.pages.miniapp.MiniAppPage
@@ -327,7 +332,26 @@ class RouteActivity : ComponentActivity() {
     fun AppRoutes() {
         val toastState = rememberToasterState()
         val settings by settingsStore.settingsFlow.collectAsStateWithLifecycle()
+        val scope = rememberCoroutineScope()
         val tts = rememberCustomTtsState()
+
+        // 首次启动：未同意免责声明时强制展示
+        if (!settings.disclaimerAccepted) {
+            DisclaimerPage(
+                onAccept = {
+                    scope.launch {
+                        settingsStore.update {
+                            it.copy(
+                                disclaimerAccepted = true,
+                                disclaimerAcceptedAt = (System.currentTimeMillis() / 1000).toInt()
+                            )
+                        }
+                    }
+                },
+                onDecline = { finish() }
+            )
+            return
+        }
         val asr = rememberCustomAsrState()
         val eventBus = koinInject<AppEventBus>()
         val migrationState by DatabaseMigrationTracker.state.collectAsStateWithLifecycle()
@@ -602,11 +626,15 @@ class RouteActivity : ComponentActivity() {
                                 DebugPage()
                             }
 
-                            entry<Screen.Log> {
-                                LogPage()
-                            }
+entry<Screen.Log> {
+    LogPage()
+}
 
-                            entry<Screen.Extensions> {
+entry<Screen.SecurityAudit> {
+    SecurityAuditPage()
+}
+
+entry<Screen.Extensions> {
                                 ExtensionsPage()
                             }
 
@@ -817,6 +845,13 @@ class RouteActivity : ComponentActivity() {
                                 )
                             }
 
+                            entry<Screen.Legal> { key ->
+                                LegalPage(
+                                    titleRes = key.titleRes,
+                                    contentRes = key.contentRes,
+                                )
+                            }
+
                         }
                     )
                     AnimatedVisibility(
@@ -991,6 +1026,9 @@ sealed interface Screen : NavKey {
     data object Log : Screen
 
     @Serializable
+    data object SecurityAudit : Screen
+
+    @Serializable
     data object Extensions : Screen
 
     @Serializable
@@ -1083,4 +1121,7 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data class MiniApp(val url: String, val title: String?) : Screen
+
+    @Serializable
+    data class Legal(val titleRes: Int, val contentRes: Int) : Screen
 }

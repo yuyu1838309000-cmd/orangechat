@@ -28,6 +28,7 @@ private const val CHANNEL_ID = "rikkahub_ai_tool"
 fun createNotificationPostTool(context: Context): Tool = Tool(
     name = "post_notification",
     description = "Post a system notification to the user. Requires notification permission.",
+    needsApproval = true,
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {
