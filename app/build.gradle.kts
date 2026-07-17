@@ -43,34 +43,41 @@ android {
         }
     }
 
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localProperties.load(FileInputStream(localPropertiesFile))
+    }
+    val hasReleaseSigning = localProperties.getProperty("storeFile") != null &&
+        localProperties.getProperty("storePassword") != null &&
+        localProperties.getProperty("keyAlias") != null &&
+        localProperties.getProperty("keyPassword") != null
+
     signingConfigs {
         create("release") {
-            val localProperties = Properties()
-            val localPropertiesFile = rootProject.file("local.properties")
-
-            if (localPropertiesFile.exists()) {
-                localProperties.load(FileInputStream(localPropertiesFile))
-
-                val storeFilePath = localProperties.getProperty("storeFile")
-                val storePasswordValue = localProperties.getProperty("storePassword")
-                val keyAliasValue = localProperties.getProperty("keyAlias")
-                val keyPasswordValue = localProperties.getProperty("keyPassword")
-
-                if (storeFilePath != null && storePasswordValue != null &&
-                    keyAliasValue != null && keyPasswordValue != null
-                ) {
-                    storeFile = file(storeFilePath)
-                    storePassword = storePasswordValue
-                    keyAlias = keyAliasValue
-                    keyPassword = keyPasswordValue
-                }
+            if (hasReleaseSigning) {
+                storeFile = file(localProperties.getProperty("storeFile"))
+                storePassword = localProperties.getProperty("storePassword")
+                keyAlias = localProperties.getProperty("keyAlias")
+                keyPassword = localProperties.getProperty("keyPassword")
             }
+        }
+        // 项目内置共享 debug keystore，保证所有机器/开发者构建的 debug 包签名一致，
+        // 避免 ~/.android/debug.keystore 因机器不同导致 adb install -r 覆盖安装失败（Failure [-99]）。
+        // keystore 参数与 Android 默认 debug 签名一致：alias=androiddebugkey, password=android。
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // 仅在配置了 release keystore 时启用 release 签名，
+            // 否则使用项目内置共享 debug keystore，保证无 keystore 的人也能编译并签名一致。
+            signingConfig = signingConfigs.getByName(if (hasReleaseSigning) "release" else "debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -82,11 +89,9 @@ android {
         }
         debug {
             applicationIdSuffix = ".debug"
-            // 统一 debug 签名为 release keystore，避免不同机器的默认 debug.keystore
-            // 签名不一致导致 adb install -r 覆盖安装失败（Failure [-99]）。
-            // 前提：local.properties 里配置了 storeFile/storePassword/keyAlias/keyPassword。
-            // 未配置时 release 签名为空，Gradle 会回退用默认 debug 签名，不影响无 keystore 的人编译。
-            signingConfig = signingConfigs.getByName("release")
+            // 统一使用项目内置共享 debug keystore；若配置了 release keystore 则改用 release 签名，
+            // 保证不同机器签名一致，避免覆盖安装失败（Failure [-99]）。
+            signingConfig = signingConfigs.getByName(if (hasReleaseSigning) "release" else "debug")
             buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
         }
