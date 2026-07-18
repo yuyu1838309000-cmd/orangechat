@@ -17,8 +17,6 @@ import androidx.compose.runtime.tooling.ComposeStackTraceMode
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.google.firebase.remoteconfig.FirebaseRemoteConfig
-import com.google.firebase.remoteconfig.remoteConfigSettings
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -80,20 +78,6 @@ class RikkaHubApp : Application() {
         }
         this.createNotificationChannel()
 
-        // 订阅公告推送主题
-        try {
-            com.google.firebase.messaging.FirebaseMessaging
-                .getInstance()
-                .subscribeToTopic("announcement")
-                .addOnCompleteListener { task ->
-                    if (!task.isSuccessful) {
-                        android.util.Log.w("AnnouncementFCM", "订阅失败", task.exception)
-                    }
-                }
-        } catch (e: Exception) {
-            android.util.Log.w("AnnouncementFCM", "FCM 异常", e)
-        }
-
         // 预热 ChatService 单例: 强制在主线程(Application.onCreate 由 Android 保证
         // 在主线程执行, 且先于同一进程内任何 Service/BroadcastReceiver/Activity 回调)
         // 解析并构造 ChatService。原因: ChatService.init 里有 ProcessLifecycleOwner
@@ -123,15 +107,6 @@ class RikkaHubApp : Application() {
 
         // sync upload files to DB
         syncManagedFiles()
-
-        // Init remote config
-        get<FirebaseRemoteConfig>().apply {
-            setConfigSettingsAsync(remoteConfigSettings {
-                minimumFetchIntervalInSeconds = 1800
-            })
-            setDefaultsAsync(R.xml.remote_config_defaults)
-            fetchAndActivate()
-        }
 
         // Start WebServer if enabled in settings
         startWebServerIfEnabled()

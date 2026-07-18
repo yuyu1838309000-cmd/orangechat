@@ -9,8 +9,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.google.services)
-    alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
@@ -18,7 +16,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "me.rerere.rikkahub"
+        applicationId = "me.rerere.orangechat"
         minSdk = 26
         targetSdk = 37
         versionCode = 159
@@ -205,6 +203,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.browser)
     implementation(libs.androidx.profileinstaller)
+    implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
 
     // BiometricPrompt (fingerprint/face verify_fingerprint tool)
     implementation(libs.androidx.biometric)
@@ -233,13 +232,6 @@ dependencies {
     implementation(libs.androidx.navigation3.ui)
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(libs.androidx.material3.adaptive.navigation3)
-
-    // Firebase
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.analytics)
-    implementation(libs.firebase.crashlytics)
-    implementation(libs.firebase.config)
-    implementation(libs.firebase.messaging)
 
     // DataStore
     implementation(libs.androidx.datastore.preferences)
