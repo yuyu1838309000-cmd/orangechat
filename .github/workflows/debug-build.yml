@@ -14,6 +14,8 @@ jobs:
           java-version: "17"
       - name: Setup pnpm
         run: npm install -g pnpm
+      - name: Generate debug keystore
+        run: keytool -genkey -v -keystore app/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
       - name: Build Debug APK
         run: |
           chmod +x gradlew
