@@ -24,10 +24,3 @@ jobs:
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/*.apk
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: debug-build
-          name: Debug Build
-          files: app/build/outputs/apk/debug/*.apk
-          prerelease: true
