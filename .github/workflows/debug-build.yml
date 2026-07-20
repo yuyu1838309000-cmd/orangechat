@@ -10,6 +10,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Setup pnpm
+        run: npm install -g pnpm
       - name: Build Debug APK
         run: |
           chmod +x gradlew
