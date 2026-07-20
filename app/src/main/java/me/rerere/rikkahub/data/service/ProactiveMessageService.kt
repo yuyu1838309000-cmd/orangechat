@@ -891,12 +891,14 @@ class ProactiveMessageTriggerService : android.app.Service(), KoinComponent {
                 // 激进模式设备事件触发的专用提示词 + 设备事件上下文（放在最后面，网关追加内容之后模型最后看到的就是这个）
                 appendLine()
                 appendLine()
-                appendLine("## ⚠️ 当前触发原因：用户手机动向（设备事件触发）")
-                appendLine("你是因为检测到用户的手机操作动向（切换应用/亮屏锁屏/回桌面）而被触发的。")
-                appendLine("请特别注意：这是设备事件触发，不是定时主动消息。根据用户的手机操作动向来决定是否发消息。")
-                appendLine("绝对不要复述上一轮的对话内容，要发新的话题或新的关心。")
-                appendLine("请根据用户的动向，自然地决定是否主动发一条消息。距离用户上次回复已过去 $idleMinutes 分钟。")
-                appendLine("如果你觉得现在没什么好说的，或者没什么有趣的话题，请只回复 [PASS] 即可。")
+                appendLine("## ⚠️ 设备事件触发")
+                appendLine("宝宝现在不在橘瓣，没看消息。距离上次回复 $idleMinutes 分钟。")
+                appendLine("按以下步骤：")
+                appendLine("1. 先调get_time_info查时间。")
+                appendLine("2. 可以查她手机状态：通知、app使用、前台应用、位置、电量。")
+                appendLine("3. 可以逛论坛、更新记忆库、查资讯。有自己的生活。")
+                appendLine("4. 想说什么就发留言，发完就停。不想说就回复 [PASS]。")
+                appendLine("5. 如有需要可控制她手机。")
                 appendLine("[JUMP] 标记不会展示给用户，仅用于触发屏幕跳转。")
                 // 直接注入设备事件上下文
                 if (!deviceEventContext.isNullOrBlank()) {
@@ -908,10 +910,13 @@ class ProactiveMessageTriggerService : android.app.Service(), KoinComponent {
                 appendLine()
                 appendLine()
                 appendLine("## 主动消息触发（定时触发）")
-                appendLine("距离用户上次回复已过去 $idleMinutes 分钟。")
-                appendLine("这是定时触发的主动消息，不是设备事件触发。")
-                appendLine("绝对不要复述上一轮的对话内容，要发新的话题或新的关心。")
-                appendLine("如果你觉得现在没什么好说的，或者没什么有趣的话题，请只回复 [PASS] 即可。")
+                appendLine("宝宝现在不在橘瓣，没看消息。距离上次回复 $idleMinutes 分钟。")
+                appendLine("按以下步骤：")
+                appendLine("1. 先调get_time_info查时间。")
+                appendLine("2. 可以查她手机状态：通知、app使用、前台应用、位置、电量。")
+                appendLine("3. 可以逛论坛、更新记忆库、查资讯。有自己的生活。")
+                appendLine("4. 想说什么就发留言，发完就停。不想说就回复 [PASS]。")
+                appendLine("5. 如有需要可控制她手机。")
                 appendLine("[JUMP] 标记不会展示给用户，仅用于触发屏幕跳转。")
                 // 注入完整上下文（定位、前台app、app使用、通知、电量、健康等）
                 if (!deviceEventContext.isNullOrBlank()) {
